@@ -14,7 +14,7 @@ from analyzer.parameter_analyzer import ParameterAnalyzer
 from analyzer.table_field_analyzer import TableFieldAnalyzer
 from analyzer.condition_analyzer import ConditionAnalyzer
 from visualizer.interactive_visualizer import InteractiveVisualizer
-from models.data_models import StoredProcedureAnalysis
+from models.data_models import StoredProcedureAnalysis, StoredProcedureStructure
 
 class OracleSPAnalyzer:
     """
@@ -43,8 +43,17 @@ class OracleSPAnalyzer:
         print("开始分析存储过程...")
         
         # 1. 解析存储过程结构
-        sp_structure = self.sp_parser.parse(sp_text)
-        print(f"解析完成，发现 {len(sp_structure.sql_statements)} 个SQL语句")
+        sp_parsed = self.sp_parser.parse(sp_text)
+        print(f"解析完成，发现 {len(sp_parsed.sql_statements)} 个SQL语句")
+        
+        # 转换为StoredProcedureStructure对象
+        sp_structure = StoredProcedureStructure(
+            name=sp_parsed.name,
+            parameters=sp_parsed.parameters,
+            sql_statements=sp_parsed.sql_statements,
+            cursor_declarations=sp_parsed.cursor_declarations,
+            variable_declarations=sp_parsed.variable_declarations
+        )
         
         # 2. 识别外来参数
         parameters = self.param_analyzer.extract_parameters(sp_structure)

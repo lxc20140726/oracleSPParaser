@@ -17,6 +17,15 @@ import subprocess
 from pathlib import Path
 
 
+def get_venv_python():
+    """获取虚拟环境Python路径"""
+    current_dir = Path(__file__).parent
+    venv_python = current_dir / "venv" / "bin" / "python"
+    if venv_python.exists():
+        return str(venv_python)
+    return sys.executable  # 如果虚拟环境不存在，使用当前Python
+
+
 def run_command(cmd, description=""):
     """运行命令并显示结果"""
     print(f"🚀 {description}")
@@ -62,7 +71,8 @@ def setup_environment():
 
 def run_unit_tests(verbose=False):
     """运行单元测试"""
-    cmd = ["pytest", "tests/unit/", "-m", "unit"]
+    venv_python = get_venv_python()
+    cmd = [venv_python, "-m", "pytest", "tests/unit/", "-m", "unit"]
     if verbose:
         cmd.extend(["-v", "-s"])
     cmd.extend(["--tb=short"])
@@ -72,7 +82,8 @@ def run_unit_tests(verbose=False):
 
 def run_integration_tests(verbose=False):
     """运行集成测试"""
-    cmd = ["pytest", "tests/integration/", "-m", "integration"]
+    venv_python = get_venv_python()
+    cmd = [venv_python, "-m", "pytest", "tests/integration/", "-m", "integration"]
     if verbose:
         cmd.extend(["-v", "-s"])
     cmd.extend(["--tb=short"])
@@ -82,7 +93,8 @@ def run_integration_tests(verbose=False):
 
 def run_api_tests(verbose=False):
     """运行API测试"""
-    cmd = ["pytest", "tests/api/", "-m", "api"]
+    venv_python = get_venv_python()
+    cmd = [venv_python, "-m", "pytest", "tests/api/", "-m", "api"]
     if verbose:
         cmd.extend(["-v", "-s"])
     cmd.extend(["--tb=short"])
@@ -92,7 +104,8 @@ def run_api_tests(verbose=False):
 
 def run_performance_tests(verbose=False):
     """运行性能测试"""
-    cmd = ["pytest", "tests/", "-m", "performance"]
+    venv_python = get_venv_python()
+    cmd = [venv_python, "-m", "pytest", "tests/", "-m", "performance"]
     if verbose:
         cmd.extend(["-v", "-s"])
     cmd.extend(["--tb=short", "--benchmark-only"])
@@ -102,7 +115,8 @@ def run_performance_tests(verbose=False):
 
 def run_smoke_tests(verbose=False):
     """运行冒烟测试"""
-    cmd = ["pytest", "tests/", "-m", "smoke"]
+    venv_python = get_venv_python()
+    cmd = [venv_python, "-m", "pytest", "tests/", "-m", "smoke"]
     if verbose:
         cmd.extend(["-v", "-s"])
     cmd.extend(["--tb=short"])
@@ -112,7 +126,8 @@ def run_smoke_tests(verbose=False):
 
 def run_all_tests(verbose=False, coverage=True):
     """运行完整测试套件"""
-    cmd = ["pytest", "tests/"]
+    venv_python = get_venv_python()
+    cmd = [venv_python, "-m", "pytest", "tests/"]
     
     if verbose:
         cmd.extend(["-v", "-s"])
@@ -133,7 +148,8 @@ def run_all_tests(verbose=False, coverage=True):
 
 def run_specific_test(test_path, verbose=False):
     """运行特定测试"""
-    cmd = ["pytest", test_path]
+    venv_python = get_venv_python()
+    cmd = [venv_python, "-m", "pytest", test_path]
     if verbose:
         cmd.extend(["-v", "-s"])
     cmd.extend(["--tb=short"])
@@ -143,14 +159,16 @@ def run_specific_test(test_path, verbose=False):
 
 def install_test_dependencies():
     """安装测试依赖"""
-    cmd = ["pip", "install", "-r", "test_requirements.txt"]
+    venv_python = get_venv_python()
+    cmd = [venv_python, "-m", "pip", "install", "-r", "test_requirements.txt"]
     return run_command(cmd, "安装测试依赖")
 
 
 def generate_test_report():
     """生成测试报告"""
+    venv_python = get_venv_python()
     cmd = [
-        "pytest", "tests/",
+        venv_python, "-m", "pytest", "tests/",
         "--html=docs/test_reports/report.html",
         "--self-contained-html",
         "--json-report",
@@ -167,17 +185,18 @@ def generate_test_report():
 def lint_code():
     """代码质量检查"""
     print("🔍 代码质量检查")
+    venv_python = get_venv_python()
     
     # Black 格式化检查
-    black_cmd = ["black", "--check", "src/", "backend/", "tests/"]
+    black_cmd = [venv_python, "-m", "black", "--check", "src/", "backend/", "tests/"]
     black_result = run_command(black_cmd, "Black 格式化检查")
     
     # Flake8 语法检查
-    flake8_cmd = ["flake8", "src/", "backend/", "tests/"]
+    flake8_cmd = [venv_python, "-m", "flake8", "src/", "backend/", "tests/"]
     flake8_result = run_command(flake8_cmd, "Flake8 语法检查")
     
     # isort 导入排序检查
-    isort_cmd = ["isort", "--check-only", "src/", "backend/", "tests/"]
+    isort_cmd = [venv_python, "-m", "isort", "--check-only", "src/", "backend/", "tests/"]
     isort_result = run_command(isort_cmd, "isort 导入排序检查")
     
     return max(black_result, flake8_result, isort_result)
