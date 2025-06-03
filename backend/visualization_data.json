@@ -1,6 +1,16 @@
 {
   "nodes": [
     {
+      "id": "table_departments",
+      "label": "departments",
+      "type": "physical_table",
+      "properties": {
+        "fields": [],
+        "sql_ids": [],
+        "color": "green"
+      }
+    },
+    {
       "id": "table_employees",
       "label": "employees",
       "type": "physical_table",
@@ -9,16 +19,6 @@
         "sql_ids": [
           "2"
         ],
-        "color": "green"
-      }
-    },
-    {
-      "id": "table_departments",
-      "label": "departments",
-      "type": "physical_table",
-      "properties": {
-        "fields": [],
-        "sql_ids": [],
         "color": "green"
       }
     },
@@ -83,16 +83,6 @@
   ],
   "edges": [
     {
-      "source": "table_employees",
-      "target": "table_temp_emp_summary",
-      "label": "SQL-1",
-      "type": "data_flow",
-      "properties": {
-        "statement_type": "INSERT",
-        "raw_sql": "INSERT INTO temp_emp_summary SELECT e.employee_id, e.first_name || ' ' || e.last_name, d.department_name, e.salary FROM employees e JOIN departments d ON e.department_id = d.department_id WHERE e.department_id = p_dept_id AND e.hire_date >= p_start_date;"
-      }
-    },
-    {
       "source": "table_departments",
       "target": "table_temp_emp_summary",
       "label": "SQL-1",
@@ -103,16 +93,17 @@
       }
     },
     {
-      "source": "param_p_dept_id",
-      "target": "table_employees",
-      "label": "uses",
-      "type": "parameter_usage",
+      "source": "table_employees",
+      "target": "table_temp_emp_summary",
+      "label": "SQL-1",
+      "type": "data_flow",
       "properties": {
-        "statement_id": "1"
+        "statement_type": "INSERT",
+        "raw_sql": "INSERT INTO temp_emp_summary SELECT e.employee_id, e.first_name || ' ' || e.last_name, d.department_name, e.salary FROM employees e JOIN departments d ON e.department_id = d.department_id WHERE e.department_id = p_dept_id AND e.hire_date >= p_start_date;"
       }
     },
     {
-      "source": "param_p_dept_id",
+      "source": "param_p_start_date",
       "target": "table_departments",
       "label": "uses",
       "type": "parameter_usage",
@@ -121,7 +112,16 @@
       }
     },
     {
-      "source": "param_p_dept_id",
+      "source": "param_p_start_date",
+      "target": "table_employees",
+      "label": "uses",
+      "type": "parameter_usage",
+      "properties": {
+        "statement_id": "1"
+      }
+    },
+    {
+      "source": "param_p_start_date",
       "target": "table_temp_emp_summary",
       "label": "uses",
       "type": "parameter_usage",
@@ -130,16 +130,7 @@
       }
     },
     {
-      "source": "param_p_start_date",
-      "target": "table_employees",
-      "label": "uses",
-      "type": "parameter_usage",
-      "properties": {
-        "statement_id": "1"
-      }
-    },
-    {
-      "source": "param_p_start_date",
+      "source": "param_p_dept_id",
       "target": "table_departments",
       "label": "uses",
       "type": "parameter_usage",
@@ -148,7 +139,16 @@
       }
     },
     {
-      "source": "param_p_start_date",
+      "source": "param_p_dept_id",
+      "target": "table_employees",
+      "label": "uses",
+      "type": "parameter_usage",
+      "properties": {
+        "statement_id": "1"
+      }
+    },
+    {
+      "source": "param_p_dept_id",
       "target": "table_temp_emp_summary",
       "label": "uses",
       "type": "parameter_usage",

@@ -4,6 +4,7 @@
 import sys
 import os
 from pathlib import Path
+import re
 
 # 添加src路径
 src_path = Path(__file__).parent.parent / "src"
@@ -215,6 +216,30 @@ def convert_to_visualization_data(result) -> Dict[str, Any]:
     nodes = []
     edges = []
     
+    # 创建别名到实际表名的映射
+    alias_to_table_map = {}
+    
+    # 构建别名映射关系
+    for stmt in result.sp_structure.sql_statements:
+        # 从 SQL 语句中提取别名信息
+        sql_text = stmt.raw_sql.upper()
+        
+        # 匹配 FROM table_name alias 格式
+        from_pattern = r'FROM\s+(\w+)\s+(\w+)'
+        from_match = re.search(from_pattern, sql_text, re.IGNORECASE)
+        if from_match:
+            table_name = from_match.group(1).lower()
+            alias = from_match.group(2).lower()
+            alias_to_table_map[alias] = table_name
+        
+        # 匹配 JOIN table_name alias 格式
+        join_pattern = r'JOIN\s+(\w+)\s+(\w+)'
+        join_matches = re.finditer(join_pattern, sql_text, re.IGNORECASE)
+        for match in join_matches:
+            table_name = match.group(1).lower()
+            alias = match.group(2).lower()
+            alias_to_table_map[alias] = table_name
+    
     # 添加参数节点
     for param in result.parameters:
         nodes.append({
@@ -288,10 +313,14 @@ def convert_to_visualization_data(result) -> Dict[str, Any]:
     
     # 添加JOIN条件边
     for join_cond in result.conditions_and_logic.join_conditions:
+        # 将别名转换为实际表名
+        left_table = alias_to_table_map.get(join_cond.left_table.lower(), join_cond.left_table)
+        right_table = alias_to_table_map.get(join_cond.right_table.lower(), join_cond.right_table)
+        
         edges.append({
-            "id": f"join_{join_cond.left_table}_{join_cond.right_table}",
-            "source": f"table_{join_cond.left_table}",
-            "target": f"table_{join_cond.right_table}",
+            "id": f"join_{left_table}_{right_table}",
+            "source": f"table_{left_table}",
+            "target": f"table_{right_table}",
             "type": "join_condition",
             "label": f"{join_cond.join_type} JOIN",
             "data": {
