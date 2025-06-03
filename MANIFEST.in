@@ -1,0 +1,106 @@
+# MANIFEST.in - 控制哪些文件被包含在发布包中
+
+# 包含根目录的重要文件
+include README.md
+include LICENSE
+include requirements.txt
+include test_requirements.txt
+include pytest.ini
+include .gitignore
+include install.py
+include run_tests.py
+
+# 包含配置文件
+include config/*.yaml
+include config/*.yml
+include config/*.json
+include config/*.ini
+
+# 包含数据文件
+recursive-include data *.sql
+recursive-include data *.txt
+recursive-include data *.json
+include data/*/.gitkeep
+
+# 包含测试文件和数据
+recursive-include tests *.py
+recursive-include tests *.sql
+recursive-include tests *.txt
+recursive-include tests *.json
+recursive-include tests *.yaml
+recursive-include tests *.yml
+
+# 包含文档文件
+recursive-include docs *.md
+recursive-include docs *.rst
+recursive-include docs *.txt
+include docs/README.md
+
+# 包含前端文件 (如果存在)
+recursive-include frontend *.html
+recursive-include frontend *.css
+recursive-include frontend *.js
+recursive-include frontend *.json
+recursive-include frontend *.md
+
+# 包含后端模板和静态文件
+recursive-include backend/templates *.html
+recursive-include backend/static *.css
+recursive-include backend/static *.js
+recursive-include backend/static *.png
+recursive-include backend/static *.jpg
+recursive-include backend/static *.ico
+
+# 包含源代码中的数据文件
+recursive-include src *.yaml
+recursive-include src *.yml
+recursive-include src *.json
+recursive-include src *.txt
+recursive-include src *.sql
+
+# 包含示例文件
+recursive-include examples *.py
+recursive-include examples *.sql
+recursive-include examples *.md
+
+# 包含脚本文件
+include scripts/*.py
+include scripts/*.sh
+include *.py
+
+# GitHub Actions 和 CI/CD 文件
+recursive-include .github *.yml
+recursive-include .github *.yaml
+
+# 排除不必要的文件
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.pyd
+global-exclude __pycache__
+global-exclude .DS_Store
+global-exclude *.so
+global-exclude .git*
+exclude .gitignore
+
+# 排除临时和缓存文件
+global-exclude *.log
+global-exclude *.tmp
+global-exclude *.bak
+global-exclude *~
+
+# 排除测试生成的文件
+exclude .coverage
+recursive-exclude htmlcov *
+recursive-exclude .pytest_cache *
+recursive-exclude .tox *
+
+# 排除IDE文件
+recursive-exclude .vscode *
+recursive-exclude .idea *
+global-exclude *.swp
+global-exclude *.swo
+
+# 排除构建文件
+recursive-exclude build *
+recursive-exclude dist *
+recursive-exclude *.egg-info * 

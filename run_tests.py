@@ -50,6 +50,14 @@ def setup_environment():
     # 设置环境变量
     os.environ["PYTHONPATH"] = ":".join(paths_to_add)
     os.environ["TESTING"] = "true"
+    
+    # 创建docs目录结构
+    docs_dir = current_dir / "docs"
+    test_reports_dir = docs_dir / "test_reports"
+    coverage_dir = docs_dir / "coverage"
+    
+    for dir_path in [docs_dir, test_reports_dir, coverage_dir]:
+        dir_path.mkdir(exist_ok=True)
 
 
 def run_unit_tests(verbose=False):
@@ -114,7 +122,8 @@ def run_all_tests(verbose=False, coverage=True):
             "--cov=src",
             "--cov=backend", 
             "--cov-report=term-missing",
-            "--cov-report=html:tests/coverage_html"
+            "--cov-report=html:docs/coverage",
+            "--cov-report=xml:docs/test_reports/coverage.xml"
         ])
     
     cmd.extend(["--tb=short"])
@@ -142,10 +151,14 @@ def generate_test_report():
     """生成测试报告"""
     cmd = [
         "pytest", "tests/",
-        "--html=tests/report.html",
+        "--html=docs/test_reports/report.html",
         "--self-contained-html",
         "--json-report",
-        "--json-report-file=tests/report.json"
+        "--json-report-file=docs/test_reports/report.json",
+        "--cov=src",
+        "--cov=backend",
+        "--cov-report=html:docs/coverage",
+        "--cov-report=xml:docs/test_reports/coverage.xml"
     ]
     
     return run_command(cmd, "生成测试报告")
@@ -238,6 +251,8 @@ def main():
     print("\n" + "=" * 60)
     if exit_code == 0:
         print("🎉 所有测试成功完成！")
+        print(f"📊 测试报告: docs/test_reports/report.html")
+        print(f"📈 覆盖率报告: docs/coverage/index.html")
     else:
         print(f"⚠️ 测试完成，但有 {exit_code} 个失败")
     print("=" * 60)

@@ -37,3 +37,25 @@ temp/
 build/
 dist/
 *.egg-info/
+
+# Testing
+.pytest_cache/
+.coverage
+*.cover
+.hypothesis/
+.tox/
+
+# Test Reports (generated files)
+docs/test_reports/
+docs/coverage/
+tests/coverage_html/
+tests/coverage.xml
+tests/report.html
+tests/report.json
+htmlcov/
+.nyc_output/
+coverage.xml
+test-results.xml
+
+# Performance Reports
+.benchmarks/

@@ -218,20 +218,23 @@ def test_complex_workflow():
 
 ```bash
 # 生成HTML覆盖率报告
-pytest tests/ --cov=src --cov=backend --cov-report=html:tests/coverage_html
+pytest tests/ --cov=src --cov=backend --cov-report=html:docs/coverage
 
 # 生成终端覆盖率报告
 pytest tests/ --cov=src --cov=backend --cov-report=term-missing
 
 # 生成XML覆盖率报告
-pytest tests/ --cov=src --cov=backend --cov-report=xml:tests/coverage.xml
+pytest tests/ --cov=src --cov=backend --cov-report=xml:docs/test_reports/coverage.xml
 ```
 
 ### 查看覆盖率报告
 
 ```bash
 # 在浏览器中打开HTML报告
-open tests/coverage_html/index.html
+open docs/coverage/index.html
+
+# 查看测试报告
+open docs/test_reports/report.html
 ```
 
 ## 🔍 调试测试
