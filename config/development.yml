@@ -1,0 +1,57 @@
+# 开发环境配置
+
+# 应用配置
+app:
+  name: "Oracle SP Parser"
+  version: "1.0.0"
+  debug: true
+  port: 8000
+  host: "0.0.0.0"
+
+# 数据库配置
+database:
+  host: "localhost"
+  port: 1521
+  service_name: "ORCL"
+  username: ""
+  password: ""
+  pool_size: 5
+  max_overflow: 10
+  pool_timeout: 30
+
+# 日志配置
+logging:
+  level: "DEBUG"
+  file: "logs/development.log"
+  max_size: "10MB"
+  backup_count: 5
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# 缓存配置
+cache:
+  enabled: true
+  ttl: 3600
+  max_size: 1000
+
+# 文件上传配置
+upload:
+  max_size: "10MB"
+  allowed_extensions: [".sql", ".txt"]
+  path: "data/input/"
+
+# 前端配置
+frontend:
+  url: "http://localhost:3000"
+  build_path: "frontend/build"
+
+# API配置
+api:
+  base_url: "http://localhost:8000/api"
+  cors_origins: ["http://localhost:3000"]
+  rate_limit: 100
+
+# 解析器配置
+parser:
+  max_depth: 10
+  timeout: 300
+  batch_size: 100 

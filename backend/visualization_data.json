@@ -1,0 +1,21 @@
+{
+  "nodes": [
+    {
+      "id": "table_users",
+      "label": "users",
+      "type": "physical_table",
+      "properties": {
+        "fields": [],
+        "sql_ids": [],
+        "color": "green"
+      }
+    }
+  ],
+  "edges": [],
+  "metadata": {
+    "procedure_name": "unknown_procedure",
+    "parameter_count": 0,
+    "statement_count": 1,
+    "table_count": 1
+  }
+}

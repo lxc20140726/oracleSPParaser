@@ -1,175 +1,232 @@
-# Oracle存储过程分析工具
+# Oracle存储过程分析工具 2.0
 
-这是一个用于分析Oracle存储过程的工具，专注于数据流向、表间字段联系和匹配条件分析，生成交互式可视化图表。
+一个现代化的Web应用，用于分析Oracle存储过程的数据流向、表关系和字段血缘关系。
 
-## 功能特点
+## ✨ 新特性
 
-1. **存储过程解析**
-   - 智能解析存储过程结构
-   - 识别参数、变量、游标声明
-   - 分离SQL语句并分类
+- 🌐 **Web界面**: 优雅的前后端分离架构
+- 📊 **可视化图形**: 交互式网络图展示数据流向
+- 🎯 **实时分析**: 无需数据库连接的静态分析
+- 📱 **响应式设计**: 支持各种设备和屏幕尺寸
+- 🔄 **文件上传**: 支持SQL文件直接上传分析
+- 📋 **详细报告**: 多维度分析结果展示
 
-2. **表关系分析**  
-   - 自动区分实体表和临时表
-   - 分析表之间的数据流向
-   - 构建表字段对象模型
+## 🏗️ 技术栈
 
-3. **条件分析**
-   - 提取JOIN连接条件
-   - 分析WHERE过滤条件
-   - 识别参数使用情况
+### 后端
+- **FastAPI**: 现代、高性能的Python Web框架
+- **SQLParse**: SQL语句解析
+- **NetworkX**: 图形分析算法
+- **Pydantic**: 数据验证和序列化
 
-4. **交互式可视化**
-   - 实时数据流向图
-   - 可交互的Web界面
-   - 支持点击查看详情
-   - 实时反映原存储过程
+### 前端
+- **React 18**: 现代React框架
+- **TypeScript**: 类型安全的JavaScript
+- **Cytoscape.js**: 强大的网络图可视化
+- **Tailwind CSS**: 实用优先的CSS框架
+- **React Hot Toast**: 优雅的通知系统
 
-## 逻辑过程
-根据您的需求，我们的分析逻辑如下：
+## 🚀 快速开始
 
-1. **获取完整存储过程，开始分析**
-   - 预处理和清理SQL文本
-   - 解析存储过程基本结构
+### 方式1: 一键启动 (推荐)
 
-2. **识别并确认外来参数**
-   - 提取参数定义（IN/OUT/INOUT）
-   - 分析参数在SQL中的使用
-
-3. **SQL解析sql语句并确认参与实体表与临时表，构建实体表与临时表对象**
-   - 识别CREATE TEMPORARY TABLE语句
-   - 区分物理表和临时表
-   - 构建表对象模型
-
-4. **检查sql涉及的实体表与临时表字段是否存在于存储中，如不存在，则添加到实体表与临时表对象中**
-   - 从SQL语句中提取字段信息
-   - 动态扩展表对象的字段列表
-   - 建立字段血缘关系
-
-5. **分别存储匹配条件和sql逻辑**
-   - 提取JOIN条件和字段对应关系
-   - 分析WHERE条件和参数绑定
-   - 识别控制流（IF/WHILE/FOR）
-
-6. **使用实体表、临时表对象，sql逻辑和匹配条件进行可视化，并确保生成的图形可以交互并实时反应到原本的存储过程当中**
-   - 生成交互式网络图
-   - 支持节点点击查看详情
-   - 实时映射到原始SQL代码
-
-## 项目架构
-
-```
-src/
-├── models/           # 数据模型定义
-│   └── data_models.py
-├── parser/           # 存储过程解析器
-│   └── sp_parser.py
-├── analyzer/         # 分析器模块
-│   ├── parameter_analyzer.py
-│   ├── table_field_analyzer.py
-│   └── condition_analyzer.py
-├── visualizer/       # 可视化模块
-│   └── interactive_visualizer.py
-└── main.py          # 主程序入口
-```
-
-## 技术特色
-
-- **无需元数据**: 不依赖数据库连接和表结构信息
-- **专注字段联系**: 重点分析表间字段的对应和转换关系
-- **智能解析**: 支持复杂的Oracle PL/SQL语法
-- **交互式可视化**: 基于Streamlit和Plotly的现代Web界面
-- **实时映射**: 可视化图形可以直接映射回原始代码
-
-## 安装要求
-
-- Python 3.8+
-- 无需Oracle客户端库
-- 现代Web浏览器
-
-## 安装步骤
-
-1. 克隆仓库
 ```bash
-git clone https://github.com/yourusername/oracleSPParaser.git
-cd oracleSPParaser
+python start_web.py
 ```
 
-2. 安装依赖
+这个脚本会自动：
+1. 检查环境依赖
+2. 安装所需包
+3. 构建前端
+4. 启动后端服务
+5. 打开浏览器
+
+### 方式2: 手动启动
+
+#### 安装依赖
+
 ```bash
+# 安装Python依赖
 pip install -r requirements.txt
+
+# 安装前端依赖 (需要Node.js)
+cd frontend
+npm install
+npm run build
+cd ..
 ```
 
-## 使用方法
+#### 启动服务
 
-### 命令行使用
 ```bash
-python run_analyzer.py
+# 启动后端API服务
+cd backend
+python main.py
+
+# 或使用uvicorn
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 编程接口
-```python
-from src.main import OracleSPAnalyzer
+## 🎯 使用指南
 
-analyzer = OracleSPAnalyzer()
-result = analyzer.analyze(sp_text)
+### 1. Web界面使用
 
-# 启动Web界面
-analyzer.start_web_interface(result)
+1. 访问 `http://localhost:8000`
+2. 在左侧输入面板输入存储过程代码
+3. 点击"开始分析"按钮
+4. 在右侧查看可视化结果
+5. 点击节点查看详细信息
+
+### 2. 文件上传
+
+- 支持 `.sql`, `.txt`, `.pls` 格式
+- 文件大小限制: 10MB
+- 必须使用UTF-8编码
+
+### 3. API接口
+
+#### 分析存储过程
+```bash
+curl -X POST "http://localhost:8000/api/analyze" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "stored_procedure": "CREATE OR REPLACE PROCEDURE..."
+     }'
 ```
 
-## 输出结果
-
-工具会生成以下输出：
-1. **控制台分析报告** - 详细的解析结果
-2. **可视化数据文件** (visualization_data.json) - 可供其他工具使用
-3. **交互式Web界面** - 实时可视化和探索
-4. **字段血缘关系** - 完整的数据流向分析
-
-## 示例
-
-输入一个包含临时表、JOIN和参数的复杂存储过程：
-
-```sql
-CREATE OR REPLACE PROCEDURE process_employee_data(
-    p_dept_id IN NUMBER,
-    p_start_date IN DATE
-) AS
-BEGIN
-    CREATE GLOBAL TEMPORARY TABLE temp_emp_summary (...);
-    
-    INSERT INTO temp_emp_summary
-    SELECT e.employee_id, e.first_name || ' ' || e.last_name, 
-           d.department_name, e.salary
-    FROM employees e
-    JOIN departments d ON e.department_id = d.department_id
-    WHERE e.department_id = p_dept_id;
-    
-    -- 更多SQL语句...
-END;
+#### 文件上传分析
+```bash
+curl -X POST "http://localhost:8000/api/analyze/file" \
+     -F "file=@procedure.sql"
 ```
 
-工具会自动：
-- 识别参数 `p_dept_id`, `p_start_date`
-- 区分物理表 `employees`, `departments` 和临时表 `temp_emp_summary`
-- 分析JOIN条件 `e.department_id = d.department_id`
-- 生成交互式数据流向图
+#### 健康检查
+```bash
+curl "http://localhost:8000/api/health"
+```
 
-## 未来规划
+## 📊 功能特性
 
-1. **支持嵌套存储过程** - 分析存储过程间的调用关系
-2. **增强字段解析** - 更精确的字段血缘分析
-3. **支持更多数据库** - 扩展到其他数据库系统
-4. **导出功能** - 支持多种格式的图表导出
+### 可视化图形
+- **参数节点**: 蓝色圆角矩形，显示输入/输出参数
+- **物理表**: 绿色矩形，表示数据库中的实际表
+- **临时表**: 黄色虚线矩形，表示临时创建的表
+- **数据流**: 蓝色箭头，表示数据从源表到目标表的流向
+- **JOIN连接**: 红色箭头，表示表之间的关联关系
+- **参数使用**: 紫色虚线，表示参数在SQL语句中的使用
 
-## 参考项目
+### 交互功能
+- **节点选择**: 点击节点查看详细信息
+- **视图控制**: 缩放、平移、重置视图
+- **布局算法**: 自动优化节点排列
+- **响应式**: 适配不同屏幕尺寸
 
-本项目在设计上参考了 [SQLFlow](https://github.com/sqlparser/sqlflow_public) 的数据血缘分析思路，专注于Oracle存储过程的特定需求。
+### 分析结果
+- **概览统计**: 参数、表、SQL语句数量
+- **参数详情**: 类型、方向、使用情况
+- **表结构**: 字段信息、类型区分
+- **SQL语句**: 详细的SQL代码和执行流程
+- **JOIN条件**: 表关联的具体条件
 
-## 贡献指南
+## 🔧 配置选项
 
-欢迎提交Issue和Pull Request来改进这个项目。
+### 环境变量
+```bash
+# API基础URL (前端)
+REACT_APP_API_URL=http://localhost:8000/api
 
-## 许可证
+# 服务端口 (后端)
+PORT=8000
 
-MIT License 
+# 开发模式
+DEBUG=true
+```
+
+### API配置
+- **CORS**: 配置跨域访问
+- **文件上传**: 限制文件大小和类型
+- **日志级别**: 控制输出详细程度
+
+## 📁 项目结构
+
+```
+oracleSPParaser/
+├── src/                    # 核心分析引擎
+│   ├── parser/            # SQL解析模块
+│   ├── analyzer/          # 数据分析模块
+│   ├── visualizer/        # 可视化模块
+│   └── models/            # 数据模型
+├── backend/               # FastAPI后端
+│   └── main.py           # API服务入口
+├── frontend/             # React前端
+│   ├── src/
+│   │   ├── components/   # React组件
+│   │   ├── services/     # API服务
+│   │   └── types.ts      # TypeScript类型
+│   └── package.json
+├── tests/                # 测试用例
+├── start_web.py          # 一键启动脚本
+└── requirements.txt      # Python依赖
+```
+
+## 🧪 测试用例
+
+### 运行测试
+```bash
+# 运行所有测试
+python -m pytest tests/
+
+# 运行特定测试
+python test_complex_procedure.py
+```
+
+### 示例存储过程
+项目包含多个测试用例：
+- 简单存储过程: 基础CRUD操作
+- 复杂存储过程: 包含游标、变量、临时表
+- JOIN分析: 多表关联查询
+- 参数使用: 不同类型参数的处理
+
+## 🔍 API文档
+
+启动服务后访问：
+- **Swagger UI**: `http://localhost:8000/api/docs`
+- **ReDoc**: `http://localhost:8000/api/redoc`
+
+## 🤝 贡献指南
+
+1. Fork项目
+2. 创建特性分支: `git checkout -b feature/AmazingFeature`
+3. 提交更改: `git commit -m 'Add some AmazingFeature'`
+4. 推送分支: `git push origin feature/AmazingFeature`
+5. 创建Pull Request
+
+## 📄 许可证
+
+本项目采用MIT许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+
+## 🔄 版本历史
+
+### 2.0.0 (2024-12-07)
+- 🌐 全新Web界面
+- 📊 交互式可视化
+- 🔧 前后端分离架构
+- 📱 响应式设计
+- 🎯 改进的分析算法
+
+### 1.0.0 (2024-12-06)
+- 🎉 初始版本
+- 📋 命令行界面
+- 🔍 基础分析功能
+- 📊 ASCII可视化
+
+## 📞 技术支持
+
+如有问题或建议，请：
+1. 查看API文档: `http://localhost:8000/api/docs`
+2. 创建Issue: [GitHub Issues](https://github.com/your-repo/issues)
+3. 查看测试用例: `tests/` 目录
+
+---
+
+**Oracle存储过程分析工具 2.0** - 让数据流向分析变得简单而优雅 ✨ 

@@ -1,0 +1,57 @@
+# 生产环境配置
+
+# 应用配置
+app:
+  name: "Oracle SP Parser"
+  version: "1.0.0"
+  debug: false
+  port: 8000
+  host: "0.0.0.0"
+
+# 数据库配置
+database:
+  host: "${DB_HOST}"
+  port: "${DB_PORT}"
+  service_name: "${DB_SERVICE_NAME}"
+  username: "${DB_USERNAME}"
+  password: "${DB_PASSWORD}"
+  pool_size: 20
+  max_overflow: 30
+  pool_timeout: 60
+
+# 日志配置
+logging:
+  level: "INFO"
+  file: "logs/production.log"
+  max_size: "50MB"
+  backup_count: 10
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# 缓存配置
+cache:
+  enabled: true
+  ttl: 7200
+  max_size: 5000
+
+# 文件上传配置
+upload:
+  max_size: "50MB"
+  allowed_extensions: [".sql", ".txt"]
+  path: "data/input/"
+
+# 前端配置
+frontend:
+  url: "${FRONTEND_URL}"
+  build_path: "frontend/build"
+
+# API配置
+api:
+  base_url: "${API_BASE_URL}"
+  cors_origins: ["${FRONTEND_URL}"]
+  rate_limit: 1000
+
+# 解析器配置
+parser:
+  max_depth: 20
+  timeout: 600
+  batch_size: 500 

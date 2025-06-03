@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import sys
+import os
+from pathlib import Path
+
+# 添加当前目录到Python路径
+current_dir = Path(__file__).parent
+sys.path.insert(0, str(current_dir))
+
 from parser.sp_parser import StoredProcedureParser
 from analyzer.parameter_analyzer import ParameterAnalyzer
 from analyzer.table_field_analyzer import TableFieldAnalyzer
