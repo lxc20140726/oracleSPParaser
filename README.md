@@ -150,23 +150,25 @@ DEBUG=true
 ## 📁 项目结构
 
 ```
-oracleSPParaser/
-├── src/                    # 核心分析引擎
-│   ├── parser/            # SQL解析模块
-│   ├── analyzer/          # 数据分析模块
-│   ├── visualizer/        # 可视化模块
-│   └── models/            # 数据模型
-├── backend/               # FastAPI后端
-│   └── main.py           # API服务入口
-├── frontend/             # React前端
-│   ├── src/
-│   │   ├── components/   # React组件
-│   │   ├── services/     # API服务
-│   │   └── types.ts      # TypeScript类型
-│   └── package.json
-├── tests/                # 测试用例
-├── start_web.py          # 一键启动脚本
-└── requirements.txt      # Python依赖
+ooracleSPParaser/
+├── 📂 src/                     # 核心源代码
+├── 📂 backend/                 # FastAPI后端服务  
+├── 📂 frontend/               # React前端（可选）
+├── 📂 scripts/                # 脚本工具
+│   ├── deployment/            # 部署脚本 (deploy.sh)
+│   ├── packaging/             # 打包脚本 (package.sh)
+│   └── development/           # 开发工具 (test_backend.py, cleanup_project.sh)
+├── 📂 docs/                   # 文档目录
+│   ├── deployment/            # 部署文档 (QUICK_DEPLOYMENT.md等)
+│   ├── development/           # 开发文档 (PROJECT_STRUCTURE.md等)
+│   └── api/                   # API文档
+├── 📂 releases/               # 发布文件
+│   └── python-packages/       # Python包 (wheel, tar.gz)
+├── 📂 config/                 # 配置文件
+├── 📂 data/                   # 数据目录
+├── 📂 logs/                   # 日志文件
+├── 📂 temp/                   # 临时文件
+└── 📄 run_backend.py         # 快速启动脚本
 ```
 
 ## 🧪 测试用例
@@ -230,3 +232,27 @@ python test_complex_procedure.py
 ---
 
 **Oracle存储过程分析工具 2.0** - 让数据流向分析变得简单而优雅 ✨ 
+## 📁 项目结构整理
+
+项目已经过整理，采用标准化目录结构：
+
+- **核心代码**: `src/`, `backend/`, `frontend/`
+- **脚本工具**: `scripts/`（按功能分类）
+- **文档**: `docs/`（按类型分类）
+- **发布文件**: `releases/`
+- **配置数据**: `config/`, `data/`, `logs/`
+
+详细结构说明请查看: `docs/development/PROJECT_STRUCTURE_CLEAN.md`
+
+### 常用命令
+
+```bash
+# 快速启动
+python3 run_backend.py
+
+# 部署
+./scripts/deployment/deploy.sh
+
+# 打包
+./scripts/packaging/package.sh
+```
