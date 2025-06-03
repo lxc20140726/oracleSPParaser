@@ -1,21 +1,233 @@
 {
   "nodes": [
     {
-      "id": "table_users",
-      "label": "users",
+      "id": "table_employees",
+      "label": "employees",
+      "type": "physical_table",
+      "properties": {
+        "fields": [],
+        "sql_ids": [
+          "2"
+        ],
+        "color": "green"
+      }
+    },
+    {
+      "id": "table_departments",
+      "label": "departments",
       "type": "physical_table",
       "properties": {
         "fields": [],
         "sql_ids": [],
         "color": "green"
       }
+    },
+    {
+      "id": "table_employee_reports",
+      "label": "employee_reports",
+      "type": "physical_table",
+      "properties": {
+        "fields": [
+          "report_date",
+          "dept_id",
+          "emp_count",
+          "avg_salary"
+        ],
+        "sql_ids": [
+          "3"
+        ],
+        "color": "green"
+      }
+    },
+    {
+      "id": "table_temp_emp_summary",
+      "label": "temp_emp_summary",
+      "type": "temp_table",
+      "properties": {
+        "fields": [],
+        "sql_ids": [
+          "0",
+          "1"
+        ],
+        "color": "orange"
+      }
+    },
+    {
+      "id": "param_p_dept_id",
+      "label": "p_dept_id",
+      "type": "parameter",
+      "properties": {
+        "data_type": "NUMBER",
+        "direction": "IN",
+        "used_in": [
+          "1",
+          "2",
+          "3"
+        ],
+        "color": "blue"
+      }
+    },
+    {
+      "id": "param_p_start_date",
+      "label": "p_start_date",
+      "type": "parameter",
+      "properties": {
+        "data_type": "DATE",
+        "direction": "IN",
+        "used_in": [
+          "1"
+        ],
+        "color": "blue"
+      }
     }
   ],
-  "edges": [],
+  "edges": [
+    {
+      "source": "table_employees",
+      "target": "table_temp_emp_summary",
+      "label": "SQL-1",
+      "type": "data_flow",
+      "properties": {
+        "statement_type": "INSERT",
+        "raw_sql": "INSERT INTO temp_emp_summary SELECT e.employee_id, e.first_name || ' ' || e.last_name, d.department_name, e.salary FROM employees e JOIN departments d ON e.department_id = d.department_id WHERE e.department_id = p_dept_id AND e.hire_date >= p_start_date;"
+      }
+    },
+    {
+      "source": "table_departments",
+      "target": "table_temp_emp_summary",
+      "label": "SQL-1",
+      "type": "data_flow",
+      "properties": {
+        "statement_type": "INSERT",
+        "raw_sql": "INSERT INTO temp_emp_summary SELECT e.employee_id, e.first_name || ' ' || e.last_name, d.department_name, e.salary FROM employees e JOIN departments d ON e.department_id = d.department_id WHERE e.department_id = p_dept_id AND e.hire_date >= p_start_date;"
+      }
+    },
+    {
+      "source": "param_p_dept_id",
+      "target": "table_employees",
+      "label": "uses",
+      "type": "parameter_usage",
+      "properties": {
+        "statement_id": "1"
+      }
+    },
+    {
+      "source": "param_p_dept_id",
+      "target": "table_departments",
+      "label": "uses",
+      "type": "parameter_usage",
+      "properties": {
+        "statement_id": "1"
+      }
+    },
+    {
+      "source": "param_p_dept_id",
+      "target": "table_temp_emp_summary",
+      "label": "uses",
+      "type": "parameter_usage",
+      "properties": {
+        "statement_id": "1"
+      }
+    },
+    {
+      "source": "param_p_start_date",
+      "target": "table_employees",
+      "label": "uses",
+      "type": "parameter_usage",
+      "properties": {
+        "statement_id": "1"
+      }
+    },
+    {
+      "source": "param_p_start_date",
+      "target": "table_departments",
+      "label": "uses",
+      "type": "parameter_usage",
+      "properties": {
+        "statement_id": "1"
+      }
+    },
+    {
+      "source": "param_p_start_date",
+      "target": "table_temp_emp_summary",
+      "label": "uses",
+      "type": "parameter_usage",
+      "properties": {
+        "statement_id": "1"
+      }
+    },
+    {
+      "source": "table_employees",
+      "target": "table_employees",
+      "label": "SQL-2",
+      "type": "data_flow",
+      "properties": {
+        "statement_type": "UPDATE",
+        "raw_sql": "UPDATE employees SET salary = salary * 1.1 WHERE department_id = p_dept_id;"
+      }
+    },
+    {
+      "source": "param_p_dept_id",
+      "target": "table_employees",
+      "label": "uses",
+      "type": "parameter_usage",
+      "properties": {
+        "statement_id": "2"
+      }
+    },
+    {
+      "source": "param_p_dept_id",
+      "target": "table_employees",
+      "label": "uses",
+      "type": "parameter_usage",
+      "properties": {
+        "statement_id": "2"
+      }
+    },
+    {
+      "source": "table_temp_emp_summary",
+      "target": "table_employee_reports",
+      "label": "SQL-3",
+      "type": "data_flow",
+      "properties": {
+        "statement_type": "INSERT",
+        "raw_sql": "INSERT INTO employee_reports (report_date, dept_id, emp_count, avg_salary) SELECT SYSDATE, p_dept_id, COUNT(*), AVG(salary) FROM temp_emp_summary;"
+      }
+    },
+    {
+      "source": "param_p_dept_id",
+      "target": "table_temp_emp_summary",
+      "label": "uses",
+      "type": "parameter_usage",
+      "properties": {
+        "statement_id": "3"
+      }
+    },
+    {
+      "source": "param_p_dept_id",
+      "target": "table_employee_reports",
+      "label": "uses",
+      "type": "parameter_usage",
+      "properties": {
+        "statement_id": "3"
+      }
+    },
+    {
+      "source": "table_e",
+      "target": "table_d",
+      "label": "INNER JOIN",
+      "type": "join_condition",
+      "properties": {
+        "left_field": "department_id",
+        "right_field": "department_id",
+        "condition": "e.department_id = d.department_id"
+      }
+    }
+  ],
   "metadata": {
-    "procedure_name": "unknown_procedure",
-    "parameter_count": 0,
-    "statement_count": 1,
-    "table_count": 1
+    "procedure_name": "process_employee_data",
+    "parameter_count": 2,
+    "statement_count": 4,
+    "table_count": 4
   }
 }
