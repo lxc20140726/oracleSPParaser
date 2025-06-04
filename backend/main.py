@@ -48,31 +48,69 @@ app.add_middleware(
 )
 
 # 挂载静态文件服务（仅在目录存在时）
-static_dir = Path(__file__).parent.parent / "frontend" / "build" / "static"
-build_dir = Path(__file__).parent.parent / "frontend" / "build"
+# 尝试多个可能的静态文件路径
+static_paths = [
+    Path(__file__).parent / "static" / "static",  # 部署环境：backend/static/static (React构建结构)
+    Path(__file__).parent / "static",  # 部署环境：backend/static
+    Path(__file__).parent.parent / "frontend" / "build" / "static",  # 开发环境
+    Path(__file__).parent.parent / "static" / "static",  # 根目录static/static
+    Path(__file__).parent.parent / "static",  # 根目录static
+]
 
-if static_dir.exists():
-    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-    logger.info(f"挂载静态文件目录: {static_dir}")
-else:
-    logger.warning(f"静态文件目录不存在，跳过挂载: {static_dir}")
+build_paths = [
+    Path(__file__).parent / "static",  # 部署环境：backend/static
+    Path(__file__).parent.parent / "frontend" / "build",  # 开发环境
+    Path(__file__).parent.parent / "static",  # 根目录static
+]
+
+# 挂载静态资源目录（CSS和JS文件）
+static_mounted = False
+for static_dir in static_paths:
+    if static_dir.exists() and (static_dir / "js").exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+        logger.info(f"✅ 挂载静态文件目录: {static_dir}")
+        static_mounted = True
+        break
+
+if not static_mounted:
+    logger.warning("⚠️ 未找到有效的静态文件目录")
+    # 调试信息：打印尝试的路径
+    for static_dir in static_paths:
+        logger.debug(f"尝试路径: {static_dir}, 存在: {static_dir.exists()}, 包含js: {(static_dir / 'js').exists() if static_dir.exists() else False}")
 
 # 挂载构建目录中的其他文件（manifest.json, favicon.ico等）
-if build_dir.exists():
-    app.mount("/assets", StaticFiles(directory=str(build_dir)), name="assets")
-    logger.info(f"挂载构建文件目录: {build_dir}")
+build_mounted = False
+for build_dir in build_paths:
+    if build_dir.exists() and (build_dir / "index.html").exists():
+        app.mount("/assets", StaticFiles(directory=str(build_dir)), name="assets")
+        logger.info(f"✅ 挂载构建文件目录: {build_dir}")
+        build_mounted = True
+        break
+
+if not build_mounted:
+    logger.warning("⚠️ 未找到有效的构建文件目录")
+    # 调试信息：打印尝试的路径
+    for build_dir in build_paths:
+        logger.debug(f"尝试路径: {build_dir}, 存在: {build_dir.exists()}, 包含index.html: {(build_dir / 'index.html').exists() if build_dir.exists() else False}")
 
 # 添加对根目录静态文件的支持
 @app.get("/manifest.json")
 async def manifest():
     """提供manifest.json文件"""
     try:
-        manifest_path = Path(__file__).parent.parent / "frontend" / "build" / "manifest.json"
-        if manifest_path.exists():
-            with open(manifest_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        else:
-            raise HTTPException(status_code=404, detail="manifest.json not found")
+        # 尝试多个可能的路径
+        manifest_paths = [
+            Path(__file__).parent / "static" / "manifest.json",  # 部署环境
+            Path(__file__).parent.parent / "frontend" / "build" / "manifest.json",  # 开发环境
+            Path(__file__).parent.parent / "static" / "manifest.json",  # 根目录static
+        ]
+        
+        for manifest_path in manifest_paths:
+            if manifest_path.exists():
+                with open(manifest_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        
+        raise HTTPException(status_code=404, detail="manifest.json not found")
     except Exception as e:
         logger.error(f"Error serving manifest.json: {e}")
         raise HTTPException(status_code=404, detail="manifest.json not found")
@@ -81,15 +119,19 @@ async def manifest():
 async def favicon():
     """提供favicon文件"""
     try:
-        favicon_path = Path(__file__).parent.parent / "frontend" / "public" / "favicon.ico"
-        if not favicon_path.exists():
-            # 如果public目录没有，尝试build目录
-            favicon_path = Path(__file__).parent.parent / "frontend" / "build" / "favicon.ico"
+        # 尝试多个可能的路径
+        favicon_paths = [
+            Path(__file__).parent / "static" / "favicon.ico",  # 部署环境
+            Path(__file__).parent.parent / "frontend" / "public" / "favicon.ico",  # 开发环境public
+            Path(__file__).parent.parent / "frontend" / "build" / "favicon.ico",  # 开发环境build
+            Path(__file__).parent.parent / "static" / "favicon.ico",  # 根目录static
+        ]
         
-        if favicon_path.exists():
-            return FileResponse(favicon_path)
-        else:
-            raise HTTPException(status_code=404, detail="favicon.ico not found")
+        for favicon_path in favicon_paths:
+            if favicon_path.exists():
+                return FileResponse(favicon_path)
+        
+        raise HTTPException(status_code=404, detail="favicon.ico not found")
     except Exception as e:
         logger.error(f"Error serving favicon.ico: {e}")
         raise HTTPException(status_code=404, detail="favicon.ico not found")
@@ -112,27 +154,62 @@ analyzer = OracleSPAnalyzer()
 async def root():
     """首页"""
     try:
-        # 尝试读取React构建的index.html
-        frontend_path = Path(__file__).parent.parent / "frontend" / "build" / "index.html"
-        if frontend_path.exists():
-            return frontend_path.read_text(encoding='utf-8')
-        else:
-            # 如果没有构建的前端，返回简单的HTML
-            return """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Oracle存储过程分析工具</title>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1">
-            </head>
-            <body>
-                <h1>Oracle存储过程分析工具</h1>
-                <p>API文档: <a href="/api/docs">/api/docs</a></p>
-                <p>前端正在构建中...</p>
-            </body>
-            </html>
-            """
+        # 尝试多个可能的index.html路径
+        index_paths = [
+            Path(__file__).parent / "static" / "index.html",  # 部署环境
+            Path(__file__).parent.parent / "frontend" / "build" / "index.html",  # 开发环境
+            Path(__file__).parent.parent / "static" / "index.html",  # 根目录static
+        ]
+        
+        for index_path in index_paths:
+            if index_path.exists():
+                logger.info(f"✅ 使用前端文件: {index_path}")
+                return index_path.read_text(encoding='utf-8')
+        
+        # 如果没有找到前端文件，返回后备页面
+        logger.warning("⚠️ 未找到前端index.html，使用后备页面")
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Oracle存储过程分析工具</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+                .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 5px; margin: 20px 0; }
+                .success { background: #d4edda; border: 1px solid #c3e6cb; padding: 20px; border-radius: 5px; margin: 20px 0; }
+                h1 { color: #333; }
+                a { color: #007bff; text-decoration: none; }
+                a:hover { text-decoration: underline; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🔍 Oracle存储过程分析工具</h1>
+                <div class="warning">
+                    <h3>⚠️ 前端界面未找到</h3>
+                    <p>Web界面文件可能未正确部署。请检查以下目录是否包含前端文件：</p>
+                    <ul>
+                        <li>backend/static/index.html</li>
+                        <li>frontend/build/index.html</li>
+                    </ul>
+                </div>
+                
+                <div class="success">
+                    <h3>✅ API服务正常运行</h3>
+                    <p>您可以使用以下API接口：</p>
+                    <ul>
+                        <li><a href="/api/docs" target="_blank">📚 API文档 (Swagger UI)</a></li>
+                        <li><a href="/api/redoc" target="_blank">📖 API文档 (ReDoc)</a></li>
+                        <li><a href="/api/health" target="_blank">💚 健康检查</a></li>
+                    </ul>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
     except Exception as e:
         logger.error(f"Error serving root page: {e}")
         return "<h1>Oracle存储过程分析工具</h1><p>服务正在启动...</p>"
