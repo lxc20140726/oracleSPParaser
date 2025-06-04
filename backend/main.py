@@ -13,7 +13,7 @@ sys.path.insert(0, str(src_path))
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import json
@@ -50,11 +50,50 @@ app.add_middleware(
 
 # 挂载静态文件服务（仅在目录存在时）
 static_dir = Path(__file__).parent.parent / "frontend" / "build" / "static"
+build_dir = Path(__file__).parent.parent / "frontend" / "build"
+
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
     logger.info(f"挂载静态文件目录: {static_dir}")
 else:
     logger.warning(f"静态文件目录不存在，跳过挂载: {static_dir}")
+
+# 挂载构建目录中的其他文件（manifest.json, favicon.ico等）
+if build_dir.exists():
+    app.mount("/assets", StaticFiles(directory=str(build_dir)), name="assets")
+    logger.info(f"挂载构建文件目录: {build_dir}")
+
+# 添加对根目录静态文件的支持
+@app.get("/manifest.json")
+async def manifest():
+    """提供manifest.json文件"""
+    try:
+        manifest_path = Path(__file__).parent.parent / "frontend" / "build" / "manifest.json"
+        if manifest_path.exists():
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        else:
+            raise HTTPException(status_code=404, detail="manifest.json not found")
+    except Exception as e:
+        logger.error(f"Error serving manifest.json: {e}")
+        raise HTTPException(status_code=404, detail="manifest.json not found")
+
+@app.get("/favicon.ico")
+async def favicon():
+    """提供favicon文件"""
+    try:
+        favicon_path = Path(__file__).parent.parent / "frontend" / "public" / "favicon.ico"
+        if not favicon_path.exists():
+            # 如果public目录没有，尝试build目录
+            favicon_path = Path(__file__).parent.parent / "frontend" / "build" / "favicon.ico"
+        
+        if favicon_path.exists():
+            return FileResponse(favicon_path)
+        else:
+            raise HTTPException(status_code=404, detail="favicon.ico not found")
+    except Exception as e:
+        logger.error(f"Error serving favicon.ico: {e}")
+        raise HTTPException(status_code=404, detail="favicon.ico not found")
 
 # 请求模型
 class AnalyzeRequest(BaseModel):
@@ -312,7 +351,37 @@ def convert_to_visualization_data(result) -> Dict[str, Any]:
                 })
     
     # 添加JOIN条件边
+    # 首先创建一个表名映射，将别名映射到实际表名
+    table_alias_map = {}
+    all_table_names = set()
+    
+    # 收集所有表名
+    for table_name in result.table_field_analysis.physical_tables.keys():
+        all_table_names.add(table_name)
+    for table_name in result.table_field_analysis.temp_tables.keys():
+        all_table_names.add(table_name)
+    
+    # 创建别名到表名的映射
+    for table_name in all_table_names:
+        # 尝试匹配别名（通常是表名的第一个字母或前几个字母）
+        table_alias_map[table_name] = table_name  # 完整表名
+        if len(table_name) > 0:
+            table_alias_map[table_name[0]] = table_name  # 首字母别名
+            table_alias_map[table_name[0].lower()] = table_name  # 小写首字母别名
+    
+    # 特殊处理常见的别名模式
+    for table_name in all_table_names:
+        if 'employees' in table_name.lower():
+            table_alias_map['e'] = table_name
+            table_alias_map['emp'] = table_name
+        elif 'departments' in table_name.lower():
+            table_alias_map['d'] = table_name
+            table_alias_map['dept'] = table_name
+        elif 'temp' in table_name.lower():
+            table_alias_map['t'] = table_name
+    
     for join_cond in result.conditions_and_logic.join_conditions:
+<<<<<<< HEAD
         # 将别名转换为实际表名
         left_table = alias_to_table_map.get(join_cond.left_table.lower(), join_cond.left_table)
         right_table = alias_to_table_map.get(join_cond.right_table.lower(), join_cond.right_table)
@@ -329,6 +398,37 @@ def convert_to_visualization_data(result) -> Dict[str, Any]:
                 "condition": join_cond.condition_text
             }
         })
+=======
+        # 解析表名，优先使用映射，如果没有则使用原名
+        left_table = table_alias_map.get(join_cond.left_table, join_cond.left_table)
+        right_table = table_alias_map.get(join_cond.right_table, join_cond.right_table)
+        
+        # 确保两个表都存在于节点列表中
+        left_node_id = f"table_{left_table}"
+        right_node_id = f"table_{right_table}"
+        
+        # 检查节点是否存在
+        node_ids = {node["id"] for node in nodes}
+        if left_node_id in node_ids and right_node_id in node_ids:
+            edges.append({
+                "id": f"join_{left_table}_{right_table}",
+                "source": left_node_id,
+                "target": right_node_id,
+                "type": "join_condition",
+                "label": f"{join_cond.join_type} JOIN",
+                "data": {
+                    "left_field": join_cond.left_field,
+                    "right_field": join_cond.right_field,
+                    "condition": join_cond.condition_text,
+                    "left_table_alias": join_cond.left_table,
+                    "right_table_alias": join_cond.right_table
+                }
+            })
+        else:
+            # 记录警告，但不创建边
+            logger.warning(f"跳过JOIN条件：找不到表节点 {left_table} 或 {right_table}")
+            logger.warning(f"可用节点: {[node['id'] for node in nodes]}")
+>>>>>>> origin/dev
     
     return {
         "nodes": nodes,

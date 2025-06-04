@@ -57,7 +57,7 @@ def main():
         result = subprocess.run([
             str(python_path), "-c", 
             "import uvicorn, fastapi; print('依赖检查通过')"
-        ], capture_output=True, text=True, cwd=project_root)
+        ], capture_output=True, text=True, encoding='utf-8', errors='ignore', cwd=project_root)
         
         if result.returncode != 0:
             print(f"❌ 依赖检查失败: {result.stderr}")
@@ -72,6 +72,10 @@ def main():
         print("💡 按 Ctrl+C 停止服务")
         print("-" * 50)
         
+        # 设置环境变量以使用UTF-8编码
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        
         # 使用subprocess启动，这样可以保持环境一致性
         subprocess.run([
             str(python_path), "-m", "uvicorn",
@@ -79,7 +83,7 @@ def main():
             "--host", "0.0.0.0",
             "--port", "8000",
             "--reload"
-        ], cwd=backend_path)
+        ], cwd=backend_path, env=env)
         
     except KeyboardInterrupt:
         print("\n🛑 服务已停止")
