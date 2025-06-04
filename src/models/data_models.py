@@ -10,6 +10,7 @@ class SQLStatementType(Enum):
     INSERT = "INSERT"
     UPDATE = "UPDATE"
     DELETE = "DELETE"
+    MERGE = "MERGE"
     CREATE_TABLE = "CREATE_TABLE"
     CREATE_TEMP_TABLE = "CREATE_TEMP_TABLE"
     DECLARE_CURSOR = "DECLARE_CURSOR"
@@ -69,6 +70,7 @@ class Parameter(BaseModel):
     name: str
     data_type: str
     direction: str  # IN, OUT, INOUT
+    default_value: Optional[str] = None
     used_in_statements: List[str] = Field(default_factory=list)
 
 class StoredProcedureStructure(BaseModel):
@@ -89,6 +91,7 @@ class ConditionsAndLogic(BaseModel):
     """条件和逻辑分析结果"""
     join_conditions: List[JoinCondition]
     where_conditions: List[WhereCondition]
+    merge_conditions: List[Dict[str, Any]] = Field(default_factory=list)  # MERGE语句条件
     control_flow: List[Dict[str, Any]]  # IF/WHILE/FOR等控制流
 
 class StoredProcedureAnalysis(BaseModel):

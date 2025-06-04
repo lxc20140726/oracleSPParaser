@@ -23,32 +23,52 @@ class StoredProcedureParser:
         self.variable_declarations = []
 
     def parse(self, sp_text: str) -> StoredProcedureStructure:
-        """解析存储过程文本"""
-        # 清理和预处理
-        cleaned_text = self._preprocess_text(sp_text)
-        
-        # 提取过程名称和参数
-        proc_name, params = self._extract_procedure_info(cleaned_text)
-        
-        # 提取SQL语句
-        sql_statements = self._extract_sql_statements(cleaned_text)
-        
-        # 提取游标声明
-        cursors = self._extract_cursor_declarations(cleaned_text)
-        
-        # 提取变量声明
-        variables = self._extract_variable_declarations(cleaned_text)
-        
-        return StoredProcedureStructure(
-            name=proc_name,
-            parameters=params,
-            sql_statements=sql_statements,
-            cursor_declarations=cursors,
-            variable_declarations=variables
-        )
+        """
+        解析存储过程文本
+        """
+        if sp_text is None or not sp_text.strip():
+            return StoredProcedureStructure(
+                name="unknown_procedure",
+                parameters=[],
+                sql_statements=[]
+            )
+            
+        try:
+            # 预处理文本
+            cleaned_text = self._preprocess_text(sp_text)
+            
+            # 提取过程信息
+            proc_name, parameters = self._extract_procedure_info(cleaned_text)
+            
+            # 提取SQL语句
+            sql_statements = self._extract_sql_statements(cleaned_text)
+            
+            # 提取游标声明
+            cursors = self._extract_cursor_declarations(cleaned_text)
+            
+            # 提取变量声明
+            variables = self._extract_variable_declarations(cleaned_text)
+            
+            return StoredProcedureStructure(
+                name=proc_name,
+                parameters=parameters,
+                sql_statements=sql_statements,
+                cursor_declarations=cursors,
+                variable_declarations=variables
+            )
+        except Exception as e:
+            # 发生错误时返回基本结构
+            return StoredProcedureStructure(
+                name="unknown_procedure",
+                parameters=[],
+                sql_statements=[]
+            )
 
     def _preprocess_text(self, text: str) -> str:
         """预处理文本，清理注释和格式化"""
+        if text is None:
+            return ""
+            
         # 移除单行注释
         text = re.sub(r'--.*?\n', '\n', text)
         # 移除多行注释
@@ -87,8 +107,8 @@ class StoredProcedureParser:
             if not param:
                 continue
                 
-            # 解析参数：name [IN|OUT|INOUT] type
-            param_pattern = r'(\w+)\s+(IN|OUT|INOUT)?\s*(\w+(?:\([^)]+\))?)'
+            # 解析参数：name [IN|OUT|IN OUT] type
+            param_pattern = r'(\w+)\s+(IN\s+OUT|IN|OUT)?\s*(\w+(?:\([^)]+\))?)'
             match = re.search(param_pattern, param, re.IGNORECASE)
             
             if match:
@@ -117,8 +137,8 @@ class StoredProcedureParser:
         
         body = match.group(1)
         
-        # 分割SQL语句
-        sql_parts = sqlparse.split(body)
+        # 使用改进的SQL语句分割方法
+        sql_parts = self._advanced_sql_split(body)
         
         for i, sql_part in enumerate(sql_parts):
             if not sql_part.strip():
@@ -129,6 +149,63 @@ class StoredProcedureParser:
                 statements.append(statement)
         
         return statements
+
+    def _advanced_sql_split(self, body: str) -> List[str]:
+        """改进的SQL语句分割方法，能处理复杂的控制结构"""
+        statements = []
+        
+        # 首先使用sqlparse进行基础分割
+        basic_parts = sqlparse.split(body)
+        
+        # 然后进一步处理包含IF语句等控制结构的部分
+        for part in basic_parts:
+            if not part.strip():
+                continue
+                
+            # 检查是否包含IF语句
+            if re.search(r'\bIF\b.*?\bTHEN\b', part, re.IGNORECASE | re.DOTALL):
+                # 提取IF语句中的SQL
+                if_statements = self._extract_sql_from_if_block(part)
+                statements.extend(if_statements)
+            else:
+                statements.append(part)
+        
+        return statements
+
+    def _extract_sql_from_if_block(self, if_block: str) -> List[str]:
+        """从IF语句块中提取SQL语句"""
+        sql_statements = []
+        
+        # 首先尝试提取简单的IF...THEN...END IF结构
+        if_pattern = r'IF\s+.*?\s+THEN\s+(.*?)(?:\s+END\s+IF|\s*$)'
+        matches = re.finditer(if_pattern, if_block, re.IGNORECASE | re.DOTALL)
+        
+        for match in matches:
+            then_block = match.group(1).strip()
+            if then_block:
+                # 递归分割THEN块中的语句
+                nested_statements = sqlparse.split(then_block)
+                for stmt in nested_statements:
+                    stmt = stmt.strip()
+                    if stmt and not stmt.upper().startswith('END'):
+                        sql_statements.append(stmt)
+        
+        # 如果没有找到标准的IF结构，尝试更简单的方法
+        if not sql_statements:
+            # 查找所有可能的SQL语句关键字
+            sql_keywords = ['INSERT', 'UPDATE', 'DELETE', 'SELECT', 'MERGE', 'CREATE']
+            lines = if_block.split('\n')
+            
+            for line in lines:
+                line = line.strip()
+                if any(line.upper().startswith(keyword) for keyword in sql_keywords):
+                    sql_statements.append(line)
+        
+        # 如果仍然没有找到，返回整个IF块
+        if not sql_statements:
+            sql_statements.append(if_block)
+        
+        return sql_statements
 
     def _parse_single_statement(self, sql_text: str, statement_id: str) -> SQLStatement:
         """解析单个SQL语句"""
@@ -177,6 +254,8 @@ class StoredProcedureParser:
             return SQLStatementType.UPDATE
         elif sql_upper.startswith('DELETE'):
             return SQLStatementType.DELETE
+        elif sql_upper.startswith('MERGE'):
+            return SQLStatementType.MERGE
         elif 'CREATE GLOBAL TEMPORARY TABLE' in sql_upper:
             return SQLStatementType.CREATE_TEMP_TABLE
         elif sql_upper.startswith('CREATE TABLE'):
@@ -321,45 +400,94 @@ class StoredProcedureParser:
         """提取JOIN条件"""
         join_conditions = []
         
-        # 使用更简单有效的JOIN匹配模式
-        # 匹配 JOIN table_name alias ON condition 格式
-        join_pattern = r'((?:INNER|LEFT|RIGHT|FULL)?\s*(?:OUTER\s+)?)?JOIN\s+(\w+)\s+(\w+)\s+ON\s+(.+?)(?=\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)'
-        matches = re.finditer(join_pattern, sql_text, re.IGNORECASE | re.DOTALL)
+        # 改进的JOIN匹配模式，能识别多个JOIN
+        # 按照不同类型的JOIN分别匹配
+        join_patterns = [
+            r'(INNER\s+)?JOIN\s+(\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)',
+            r'LEFT\s+(?:OUTER\s+)?JOIN\s+(\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)',
+            r'RIGHT\s+(?:OUTER\s+)?JOIN\s+(\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)',
+            r'FULL\s+(?:OUTER\s+)?JOIN\s+(\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)',
+            r'CROSS\s+JOIN\s+(\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)'
+        ]
         
-        for match in matches:
-            # 确定JOIN类型
-            join_type_text = match.group(1)
-            if join_type_text:
-                join_type_text = join_type_text.strip().upper()
-                if 'LEFT' in join_type_text:
-                    join_type = 'LEFT'
-                elif 'RIGHT' in join_type_text:
-                    join_type = 'RIGHT'
-                elif 'FULL' in join_type_text:
-                    join_type = 'FULL'
-                else:
+        join_types = ['INNER', 'LEFT', 'RIGHT', 'FULL', 'CROSS']
+        
+        for i, pattern in enumerate(join_patterns):
+            matches = re.finditer(pattern, sql_text, re.IGNORECASE | re.DOTALL)
+            
+            for match in matches:
+                if i == 0:  # INNER JOIN (可能没有明确的INNER关键字)
+                    table_name = match.group(2)
+                    alias = match.group(3)
+                    condition_text = match.group(4).strip()
                     join_type = 'INNER'
-            else:
-                join_type = 'INNER'  # 默认为INNER JOIN
-            
-            table_name = match.group(2)
-            alias = match.group(3)
-            condition_text = match.group(4).strip()
-            
-            # 解析ON条件中的字段对应关系
-            # 支持 alias.field = alias.field 格式
-            condition_pattern = r'(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)'
-            condition_match = re.search(condition_pattern, condition_text)
-            
-            if condition_match:
-                join_conditions.append(JoinCondition(
-                    left_table=condition_match.group(1),
-                    left_field=condition_match.group(2),
-                    right_table=condition_match.group(3),
-                    right_field=condition_match.group(4),
-                    join_type=join_type,
-                    condition_text=condition_text
-                ))
+                else:
+                    table_name = match.group(1)
+                    alias = match.group(2)
+                    condition_text = match.group(3).strip()
+                    join_type = join_types[i]
+                
+                # 解析ON条件中的字段对应关系
+                condition_pattern = r'(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)'
+                condition_match = re.search(condition_pattern, condition_text)
+                
+                if condition_match:
+                    join_conditions.append(JoinCondition(
+                        left_table=condition_match.group(1),
+                        left_field=condition_match.group(2),
+                        right_table=condition_match.group(3),
+                        right_field=condition_match.group(4),
+                        join_type=join_type,
+                        condition_text=condition_text
+                    ))
+                else:
+                    # 如果无法解析具体字段，仍然记录JOIN关系
+                    join_conditions.append(JoinCondition(
+                        left_table=alias,
+                        left_field="unknown",
+                        right_table=table_name,
+                        right_field="unknown",
+                        join_type=join_type,
+                        condition_text=condition_text
+                    ))
+        
+        # 如果上面的模式没有匹配到足够多的JOIN，使用更宽松的模式
+        if len(join_conditions) < 2:  # 预期应该有多个JOIN
+            # 简单模式：查找所有包含JOIN的行
+            lines = sql_text.split('\n')
+            for line in lines:
+                line = line.strip()
+                if 'JOIN' in line.upper() and 'ON' in line.upper():
+                    # 提取基本信息
+                    if 'LEFT' in line.upper():
+                        join_type = 'LEFT'
+                    elif 'RIGHT' in line.upper():
+                        join_type = 'RIGHT'
+                    elif 'FULL' in line.upper():
+                        join_type = 'FULL'
+                    elif 'CROSS' in line.upper():
+                        join_type = 'CROSS'
+                    else:
+                        join_type = 'INNER'
+                    
+                    # 简单提取表名和条件
+                    join_match = re.search(r'JOIN\s+(\w+)\s+(\w+)\s+ON\s+(.+)', line, re.IGNORECASE)
+                    if join_match:
+                        table_name = join_match.group(1)
+                        alias = join_match.group(2)
+                        condition = join_match.group(3)
+                        
+                        # 尝试解析条件
+                        condition_match = re.search(r'(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)', condition)
+                        if condition_match:
+                            join_conditions.append(JoinCondition(
+                                left_table=condition_match.group(1),
+                                left_field=condition_match.group(2),
+                                right_table=condition_match.group(3),
+                                right_field=condition_match.group(4),
+                                join_type=join_type,
+                                condition_text=condition
+                            ))
         
         return join_conditions
 

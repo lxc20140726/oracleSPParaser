@@ -7,11 +7,13 @@ pytest配置和公共fixtures
 import sys
 import os
 import pytest
+import pytest_asyncio
 import asyncio
 from pathlib import Path
 from typing import Generator, Dict, Any
 from unittest.mock import Mock, AsyncMock
 import importlib.util
+from httpx import AsyncClient, ASGITransport
 
 # 设置项目路径
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -406,4 +408,18 @@ def pytest_sessionstart(session):
 
 def pytest_sessionfinish(session, exitstatus):
     """测试会话结束时的清理"""
-    print(f"\n✅ 测试完成，退出码: {exitstatus}") 
+    print(f"\n✅ 测试完成，退出码: {exitstatus}")
+
+@pytest_asyncio.fixture
+async def async_client(fastapi_app):
+    """创建异步测试客户端"""
+    async with AsyncClient(
+        transport=ASGITransport(app=fastapi_app), 
+        base_url="http://test"
+    ) as client:
+        yield client
+
+@pytest.fixture
+def async_transport():
+    """创建一个ASGITransport实例"""
+    return ASGITransport(base_url="http://localhost:8000") 
