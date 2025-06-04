@@ -141,8 +141,8 @@ class InteractiveVisualizer:
     def _save_visualization_data(self, analysis: StoredProcedureAnalysis):
         """保存可视化数据"""
         viz_data = {
-            "nodes": [node.dict() for node in self.nodes],
-            "edges": [edge.dict() for edge in self.edges],
+            "nodes": [node.model_dump() for node in self.nodes],
+            "edges": [edge.model_dump() for edge in self.edges],
             "metadata": {
                 "procedure_name": analysis.sp_structure.name,
                 "parameter_count": len(analysis.parameters),

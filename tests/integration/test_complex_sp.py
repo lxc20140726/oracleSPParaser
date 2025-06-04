@@ -222,7 +222,15 @@ def test_complex_stored_procedure():
     
     print(f"\n💾 可视化数据已保存到: visualization_data.json")
     
-    return result
+    # 验证分析结果
+    assert result is not None, "分析结果不应为空"
+    assert result.sp_structure.name == "complex_data_processing", f"期望存储过程名称为complex_data_processing，实际为{result.sp_structure.name}"
+    assert len(result.parameters) == 5, f"期望5个参数，实际{len(result.parameters)}个"
+    assert len(result.sp_structure.sql_statements) > 0, "应该识别出SQL语句"
+    assert len(result.table_field_analysis.physical_tables) >= 2, "应该识别出物理表"
+    assert len(result.table_field_analysis.temp_tables) >= 2, "应该识别出临时表"
+    
+    print(f"\n✅ 复杂存储过程分析测试通过!")
 
 if __name__ == "__main__":
     test_complex_stored_procedure() 
