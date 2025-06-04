@@ -2,9 +2,17 @@
 # -*- coding: utf-8 -*-
 
 import networkx as nx
-import matplotlib.pyplot as plt
 from typing import Dict, Any
-import pygraphviz as pgv
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
+
+try:
+    import pygraphviz as pgv
+except ImportError:
+    pgv = None
 
 class GraphGenerator:
     def __init__(self):
@@ -47,12 +55,16 @@ class GraphGenerator:
         """
         保存生成的图表
         """
-        # 使用pygraphviz生成更美观的图
-        A = nx.nx_agraph.to_agraph(self.graph)
-        A.layout(prog='dot')
-        
-        # 保存表关系图
-        A.draw('table_relationships.png')
+        if pgv and len(self.graph.nodes) > 0:
+            try:
+                # 使用pygraphviz生成更美观的图
+                A = nx.nx_agraph.to_agraph(self.graph)
+                A.layout(prog='dot')
+                
+                # 保存表关系图
+                A.draw('table_relationships.png')
+            except Exception as e:
+                print(f"使用pygraphviz保存图表失败: {e}")
         
         # 保存数据流向图
         # 这里需要根据实际的数据流向分析结果来生成
@@ -62,6 +74,9 @@ class GraphGenerator:
         """
         绘制并保存图表
         """
+        if not plt:
+            return
+            
         plt.figure(figsize=(12, 8))
         pos = nx.spring_layout(graph)
         nx.draw(
