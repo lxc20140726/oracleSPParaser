@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import cytoscape from 'cytoscape';
 import cose from 'cytoscape-cose-bilkent';
 import { AnalysisResult, VisualizationNode } from '../types';
@@ -20,8 +20,8 @@ const VisualizationPanel: React.FC<VisualizationPanelProps> = ({
   const [selectedNode, setSelectedNode] = useState<VisualizationNode | null>(null);
   const [showLegend, setShowLegend] = useState(true);
 
-  // 克莱因蓝主题的Cytoscape样式配置
-  const cytoscapeStyle: any[] = [
+  // 克莱因蓝主题的Cytoscape样式配置 - 使用useMemo优化
+  const cytoscapeStyle = useMemo(() => [
     // 参数节点样式
     {
       selector: 'node[group = "parameter"]',
@@ -157,8 +157,10 @@ const VisualizationPanel: React.FC<VisualizationPanelProps> = ({
       style: {
         'border-width': '5px',
         'border-color': '#ff6b6b',
-        'box-shadow': '0 0 30px rgba(255, 107, 107, 0.8)',
+        'border-opacity': 1,
         'z-index': 999,
+        'overlay-opacity': 0.2,
+        'overlay-color': '#ff6b6b',
       },
     },
     // 悬停效果
@@ -169,7 +171,7 @@ const VisualizationPanel: React.FC<VisualizationPanelProps> = ({
         'overlay-color': '#0c47d6',
       },
     },
-  ];
+  ] as any[], []);
 
   // 初始化Cytoscape
   useEffect(() => {
@@ -210,7 +212,7 @@ const VisualizationPanel: React.FC<VisualizationPanelProps> = ({
     return () => {
       cyRef.current?.destroy();
     };
-  }, []);
+  }, [cytoscapeStyle]);
 
   // 更新图数据
   useEffect(() => {
