@@ -39,7 +39,7 @@ const TableHeaderNode: React.FC<NodeProps> = ({ data, selected }) => {
 
 // 字段组件
 const TableFieldNode: React.FC<NodeProps> = ({ data, selected }) => {
-  const { label, isComputed, isTemporary, isFirst, isLast } = data;
+  const { label, isComputed, isTemporary, isFirst, isLast, onMouseEnter, onMouseLeave } = data;
   
   const bgColor = isTemporary ? 'bg-yellow-50' : 'bg-white';
   const borderColor = isTemporary ? 'border-orange-500' : 'border-green-500';
@@ -54,13 +54,17 @@ const TableFieldNode: React.FC<NodeProps> = ({ data, selected }) => {
         : '';
 
   return (
-    <div className={`relative px-3 py-2 border-l border-r min-w-[200px] ${
-      bgColor
-    } ${borderColor} ${
-      isLast ? 'border-b' : ''
-    } ${roundedClass} ${
-      selected ? 'ring-2 ring-blue-400' : ''
-    } ${isComputed ? 'border-dashed italic' : 'border-solid'}`}>
+    <div 
+      className={`relative px-3 py-2 border-l border-r min-w-[200px] cursor-pointer transition-all duration-200 ${
+        bgColor
+      } ${borderColor} ${
+        isLast ? 'border-b' : ''
+      } ${roundedClass} ${
+        selected ? 'ring-2 ring-blue-400' : ''
+      } ${isComputed ? 'border-dashed italic' : 'border-solid'} hover:shadow-md hover:scale-105`}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       <div className={`flex items-center ${textColor}`}>
         <span className="mr-2 font-mono">
           {isComputed ? '◆' : '•'}
@@ -112,6 +116,7 @@ const ReactFlowUMLPanel: React.FC<ReactFlowUMLPanelProps> = ({
   const [selectedNode, setSelectedNode] = useState<any>(null);
   const [showFieldMappings, setShowFieldMappings] = useState(true);
   const [showTableRelations, setShowTableRelations] = useState(true);
+  const [hoveredField, setHoveredField] = useState<string | null>(null);
 
   // 处理连接
   const onConnect = useCallback(
@@ -123,6 +128,42 @@ const ReactFlowUMLPanel: React.FC<ReactFlowUMLPanelProps> = ({
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     setSelectedNode(node.data);
   }, []);
+
+  // 自定义节点变化处理 - 实现表头拖拽时字段跟随
+  const customOnNodesChange = useCallback((changes: any[]) => {
+    // 处理表头拖拽时字段跟随
+    const updatedChanges = [...changes];
+    
+    changes.forEach((change) => {
+      if (change.type === 'position' && change.position) {
+        const draggedNode = nodes.find(n => n.id === change.id);
+        if (draggedNode?.data.nodeType === 'header') {
+          const tableId = draggedNode.data.tableId;
+          const deltaX = change.position.x - draggedNode.position.x;
+          const deltaY = change.position.y - draggedNode.position.y;
+          
+          // 为相关字段添加位置变化
+          nodes.forEach((node) => {
+            if (node.data.tableId === tableId && node.data.nodeType === 'field') {
+              const existingChange = updatedChanges.find(c => c.id === node.id && c.type === 'position');
+              if (!existingChange) {
+                updatedChanges.push({
+                  type: 'position',
+                  id: node.id,
+                  position: {
+                    x: node.position.x + deltaX,
+                    y: node.position.y + deltaY,
+                  },
+                });
+              }
+            }
+          });
+        }
+      }
+    });
+    
+    onNodesChange(updatedChanges);
+  }, [nodes, onNodesChange]);
 
   // 生成React Flow数据
   useEffect(() => {
@@ -180,8 +221,10 @@ const ReactFlowUMLPanel: React.FC<ReactFlowUMLPanelProps> = ({
             nodeType: 'field',
             field: field,
             tableName: table.label,
+            onMouseEnter: () => setHoveredField(fieldNodeId),
+            onMouseLeave: () => setHoveredField(null),
           },
-          draggable: true,
+          draggable: false, // 字段不单独拖拽
         });
       });
     });
@@ -198,26 +241,36 @@ const ReactFlowUMLPanel: React.FC<ReactFlowUMLPanelProps> = ({
           
           const sourceId = `field-${mapping.source}-${sourceFieldIndex}`;
           const targetId = `field-${mapping.target}-${targetFieldIndex}`;
+          const isComputed = mapping.properties?.mapping_type === 'computed_insert';
+          
+          // 判断是否需要高亮
+          const isHighlighted = hoveredField === sourceId || hoveredField === targetId;
           
           flowEdges.push({
             id: `field-mapping-${index}`,
             source: sourceId,
             target: targetId,
-            type: mapping.properties?.mapping_type === 'computed_insert' ? 'smoothstep' : 'default',
-            animated: mapping.properties?.mapping_type === 'computed_insert',
+            type: 'default',
+            animated: isHighlighted, // 悬停时显示动画
             style: {
-              stroke: mapping.properties?.color || '#2196F3',
-              strokeWidth: 2,
-              strokeDasharray: mapping.properties?.mapping_type === 'computed_insert' ? '8,4' : undefined,
+              stroke: '#000000', // 统一使用黑色
+              strokeWidth: isHighlighted ? 3 : 2,
+              strokeDasharray: isComputed ? '8,4' : undefined, // 计算字段使用虚线
+              opacity: isHighlighted ? 1 : 0.3, // 常态虚化，悬停高亮
+              transition: 'all 0.2s ease-in-out',
             },
-            label: mapping.label,
+            label: isHighlighted ? mapping.label : '', // 悬停时显示标签
             labelStyle: {
               fontSize: 10,
               fontWeight: 500,
+              fill: '#000000',
+              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+              padding: '2px 6px',
+              borderRadius: '4px',
             },
             markerEnd: {
               type: MarkerType.ArrowClosed,
-              color: mapping.properties?.color || '#2196F3',
+              color: '#000000',
             },
           });
         }
@@ -324,7 +377,7 @@ const ReactFlowUMLPanel: React.FC<ReactFlowUMLPanelProps> = ({
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
+          onNodesChange={customOnNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={onNodeClick}
@@ -410,12 +463,19 @@ const ReactFlowUMLPanel: React.FC<ReactFlowUMLPanelProps> = ({
               <span>临时表</span>
             </div>
             <div className="flex items-center">
-              <div className="w-4 h-1 bg-blue-500 mr-2"></div>
-              <span>字段映射</span>
+              <div className="w-4 h-1 bg-black mr-2"></div>
+              <span>字段映射(实线)</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-1 border-b-2 border-dashed border-black mr-2"></div>
+              <span>计算字段(虚线)</span>
             </div>
             <div className="flex items-center">
               <div className="w-4 h-1 bg-green-600 mr-2"></div>
               <span>表关系(JOIN)</span>
+            </div>
+            <div className="text-gray-500 text-xs mt-2">
+              💡 悬停字段查看相关连接
             </div>
           </div>
         </div>
