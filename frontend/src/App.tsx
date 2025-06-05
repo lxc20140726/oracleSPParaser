@@ -4,6 +4,7 @@ import Header from './components/Header';
 import InputPanel from './components/InputPanel';
 import VisualizationPanel from './components/VisualizationPanel';
 import UMLVisualizationPanel from './components/UMLVisualizationPanel';
+import ReactFlowUMLPanel from './components/ReactFlowUMLPanel';
 import ResultsPanel from './components/ResultsPanel';
 import { AnalysisResult } from './types';
 import './App.css';
@@ -12,7 +13,8 @@ const App: React.FC = () => {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [umlAnalysisResult, setUMLAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [activeView, setActiveView] = useState<'standard' | 'uml'>('standard');
+  const [activeView, setActiveView] = useState<'standard' | 'uml' | 'reactflow'>('standard');
+  const [umlEngine, setUmlEngine] = useState<'cytoscape' | 'reactflow'>('reactflow');
 
   const handleAnalysisComplete = (result: AnalysisResult) => {
     setAnalysisResult(result);
@@ -22,7 +24,7 @@ const App: React.FC = () => {
 
   const handleUMLAnalysisComplete = (result: AnalysisResult) => {
     setUMLAnalysisResult(result);
-    setActiveView('uml');
+    setActiveView(umlEngine === 'reactflow' ? 'reactflow' : 'uml');
     setIsAnalyzing(false);
   };
 
@@ -72,7 +74,18 @@ const App: React.FC = () => {
                     }`}
                     disabled={!analysisResult}
                   >
-                    📊 标准视图
+                    📊 智能分析
+                  </button>
+                  <button
+                    onClick={() => setActiveView('reactflow')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      activeView === 'reactflow'
+                        ? 'bg-green-500 text-white'
+                        : 'text-gray-600 hover:text-gray-800'
+                    }`}
+                    disabled={!umlAnalysisResult}
+                  >
+                    🚀 UML图表 (React Flow)
                   </button>
                   <button
                     onClick={() => setActiveView('uml')}
@@ -83,7 +96,7 @@ const App: React.FC = () => {
                     }`}
                     disabled={!umlAnalysisResult}
                   >
-                    🗂️ UML视图
+                    🗂️ UML图表 (Cytoscape)
                   </button>
                 </div>
               </div>
@@ -94,6 +107,11 @@ const App: React.FC = () => {
               {activeView === 'standard' ? (
                 <VisualizationPanel
                   analysisResult={analysisResult}
+                  isLoading={isAnalyzing}
+                />
+              ) : activeView === 'reactflow' ? (
+                <ReactFlowUMLPanel
+                  umlData={umlAnalysisResult?.uml_visualization || null}
                   isLoading={isAnalyzing}
                 />
               ) : (
