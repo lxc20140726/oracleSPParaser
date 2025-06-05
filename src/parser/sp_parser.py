@@ -276,15 +276,15 @@ class StoredProcedureParser:
         source_tables = []
         target_tables = []
         
-        # 提取FROM子句中的表
+        # 提取FROM子句中的表 - 支持schema.table格式（包括带#的临时表）
         from_pattern = r'FROM\s+(.*?)(?:\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)'
         from_match = re.search(from_pattern, sql_text, re.IGNORECASE | re.DOTALL)
         if from_match:
             from_clause = from_match.group(1)
-            # 提取表名（包括JOIN的表）
+            # 提取表名（包括JOIN的表）- 支持schema.table格式和带#的临时表
             table_patterns = [
-                r'(\w+)(?:\s+(\w+))?(?:\s+(?:INNER|LEFT|RIGHT|FULL)?\s*JOIN|,|\s*$)',  # 主表和JOIN表
-                r'JOIN\s+(\w+)(?:\s+(\w+))?',  # JOIN表
+                r'(\w+\.(?:#)?\w+|\w+)(?:\s+(\w+))?(?:\s+(?:INNER|LEFT|RIGHT|FULL)?\s*JOIN|,|\s*$)',  # 主表和JOIN表，支持schema.table和带#的表名
+                r'JOIN\s+(\w+\.(?:#)?\w+|\w+)(?:\s+(\w+))?',  # JOIN表，支持schema.table和带#的表名
             ]
             
             for pattern in table_patterns:
@@ -294,26 +294,26 @@ class StoredProcedureParser:
                     if table_name and table_name.upper() not in ['ON', 'WHERE', 'GROUP', 'ORDER', 'HAVING'] and self._is_valid_table_name(table_name):
                         source_tables.append(table_name)
         
-        # 根据语句类型提取目标表
+        # 根据语句类型提取目标表 - 支持schema.table格式和带#的临时表
         if stmt_type == SQLStatementType.INSERT:
-            insert_pattern = r'INSERT\s+INTO\s+(\w+)'
+            insert_pattern = r'INSERT\s+INTO\s+(\w+\.(?:#)?\w+|\w+)'
             insert_match = re.search(insert_pattern, sql_text, re.IGNORECASE)
             if insert_match:
                 target_tables.append(insert_match.group(1))
         elif stmt_type == SQLStatementType.UPDATE:
-            update_pattern = r'UPDATE\s+(\w+)'
+            update_pattern = r'UPDATE\s+(\w+\.(?:#)?\w+|\w+)'
             update_match = re.search(update_pattern, sql_text, re.IGNORECASE)
             if update_match:
                 target_tables.append(update_match.group(1))
                 # UPDATE语句中的表也是源表（用于读取）
                 source_tables.append(update_match.group(1))
         elif stmt_type == SQLStatementType.DELETE:
-            delete_pattern = r'DELETE\s+FROM\s+(\w+)'
+            delete_pattern = r'DELETE\s+FROM\s+(\w+\.(?:#)?\w+|\w+)'
             delete_match = re.search(delete_pattern, sql_text, re.IGNORECASE)
             if delete_match:
                 target_tables.append(delete_match.group(1))
         elif stmt_type in [SQLStatementType.CREATE_TABLE, SQLStatementType.CREATE_TEMP_TABLE]:
-            create_pattern = r'CREATE\s+(?:GLOBAL\s+TEMPORARY\s+)?TABLE\s+(\w+)'
+            create_pattern = r'CREATE\s+(?:GLOBAL\s+TEMPORARY\s+)?TABLE\s+(\w+\.(?:#)?\w+|\w+)'
             create_match = re.search(create_pattern, sql_text, re.IGNORECASE)
             if create_match:
                 target_tables.append(create_match.group(1))
@@ -379,8 +379,8 @@ class StoredProcedureParser:
             if not field or field == '*':
                 continue
                 
-            # 匹配 table.field 格式
-            table_field_pattern = r'(\w+)\.(\w+)'
+            # 匹配 schema.table.field 或 table.field 格式，支持带#的临时表
+            table_field_pattern = r'(\w+\.(?:#)?\w+|\w+)\.(\w+)'
             match = re.search(table_field_pattern, field)
             if match:
                 field_refs.append(FieldReference(
@@ -391,8 +391,8 @@ class StoredProcedureParser:
         return field_refs
 
     def _extract_target_table_name(self, sql_text: str) -> str:
-        """提取目标表名"""
-        insert_pattern = r'INSERT\s+INTO\s+(\w+)'
+        """提取目标表名 - 支持schema.table格式和带#的临时表"""
+        insert_pattern = r'INSERT\s+INTO\s+(\w+\.(?:#)?\w+|\w+)'
         match = re.search(insert_pattern, sql_text, re.IGNORECASE)
         return match.group(1) if match else "unknown_table"
 
@@ -400,14 +400,14 @@ class StoredProcedureParser:
         """提取JOIN条件"""
         join_conditions = []
         
-        # 改进的JOIN匹配模式，能识别多个JOIN
+        # 改进的JOIN匹配模式，能识别多个JOIN - 支持schema.table格式和带#的临时表
         # 按照不同类型的JOIN分别匹配
         join_patterns = [
-            r'(INNER\s+)?JOIN\s+(\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)',
-            r'LEFT\s+(?:OUTER\s+)?JOIN\s+(\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)',
-            r'RIGHT\s+(?:OUTER\s+)?JOIN\s+(\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)',
-            r'FULL\s+(?:OUTER\s+)?JOIN\s+(\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)',
-            r'CROSS\s+JOIN\s+(\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)'
+            r'(INNER\s+)?JOIN\s+(\w+\.(?:#)?\w+|\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)',
+            r'LEFT\s+(?:OUTER\s+)?JOIN\s+(\w+\.(?:#)?\w+|\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)',
+            r'RIGHT\s+(?:OUTER\s+)?JOIN\s+(\w+\.(?:#)?\w+|\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)',
+            r'FULL\s+(?:OUTER\s+)?JOIN\s+(\w+\.(?:#)?\w+|\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)',
+            r'CROSS\s+JOIN\s+(\w+\.(?:#)?\w+|\w+)\s+(\w+)\s+ON\s+([^J]+?)(?=\s+(?:LEFT|RIGHT|FULL|INNER|CROSS)?\s*JOIN|\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)'
         ]
         
         join_types = ['INNER', 'LEFT', 'RIGHT', 'FULL', 'CROSS']
@@ -427,8 +427,8 @@ class StoredProcedureParser:
                     condition_text = match.group(3).strip()
                     join_type = join_types[i]
                 
-                # 解析ON条件中的字段对应关系
-                condition_pattern = r'(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)'
+                # 解析ON条件中的字段对应关系 - 支持schema.table.field格式
+                condition_pattern = r'(\w+\.(?:#)?\w+|\w+)\.(\w+)\s*=\s*(\w+\.(?:#)?\w+|\w+)\.(\w+)'
                 condition_match = re.search(condition_pattern, condition_text)
                 
                 if condition_match:
@@ -575,13 +575,14 @@ class StoredProcedureParser:
         return variables
 
     def _is_valid_table_name(self, name: str) -> bool:
-        """判断是否为有效的表名"""
+        """判断是否为有效的表名 - 支持schema.table格式和带#的临时表"""
         # 排除明显的字段名
         field_keywords = {
             'department_id', 'employee_id', 'salary', 'hire_date', 
             'first_name', 'last_name', 'department_name', 'report_date',
             'emp_count', 'avg_salary', 'dept_id', 'processing_date',
-            'salary_category', 'total_employees', 'high_salary_count'
+            'salary_category', 'total_employees', 'high_salary_count',
+            'user_id', 'student_id'  # 添加常见的字段名
         }
         
         # 排除SQL关键字
@@ -600,10 +601,63 @@ class StoredProcedureParser:
         # 如果是SQL关键字，返回False
         if name_lower in sql_keywords:
             return False
+        
+        # 检查是否是schema.table格式
+        if '.' in name:
+            # 分割schema和table部分
+            parts = name.split('.')
+            if len(parts) == 2:
+                schema, table_name = parts
+                
+                # 特殊检查：如果schema是单字母（通常是别名）且table_name看起来像字段，则认为是字段引用
+                if len(schema) <= 3 and self._looks_like_field_name(table_name):
+                    return False
+                
+                # 验证schema和table部分都是有效的标识符
+                if not self._is_valid_identifier(schema) or not self._is_valid_identifier(table_name):
+                    return False
+                # 支持带#的临时表名
+                return True
+            else:
+                return False
+        else:
+            # 单个表名的验证
+            if not self._is_valid_identifier(name):
+                return False
             
-        # 如果包含明显的字段后缀，返回False
-        field_suffixes = ['_id', '_name', '_date', '_count', '_salary']
+            # 如果包含明显的字段后缀，返回False
+            field_suffixes = ['_id', '_name', '_date', '_count', '_salary']
+            if any(name_lower.endswith(suffix) for suffix in field_suffixes):
+                return False
+                
+        return True
+    
+    def _looks_like_field_name(self, name: str) -> bool:
+        """判断名称是否看起来像字段名"""
+        name_lower = name.lower()
+        
+        # 常见字段后缀
+        field_suffixes = ['_id', '_name', '_date', '_count', '_salary', '_code', '_status', '_type']
         if any(name_lower.endswith(suffix) for suffix in field_suffixes):
-            return False
+            return True
             
-        return True 
+        # 常见字段名
+        common_fields = {
+            'id', 'name', 'code', 'status', 'type', 'value', 'amount', 
+            'user_id', 'student_id', 'department_id', 'employee_id'
+        }
+        if name_lower in common_fields:
+            return True
+            
+        return False
+    
+    def _is_valid_identifier(self, identifier: str) -> bool:
+        """验证是否是有效的Oracle标识符（支持带#的临时表）"""
+        if not identifier:
+            return False
+        
+        # Oracle标识符规则：以字母或#开头，后面可以跟字母、数字、下划线、#
+        # 支持临时表的#前缀
+        import re
+        pattern = r'^[a-zA-Z#][a-zA-Z0-9_#]*$'
+        return bool(re.match(pattern, identifier)) 

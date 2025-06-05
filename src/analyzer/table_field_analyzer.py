@@ -18,10 +18,22 @@ class TableFieldAnalyzer:
         
         # 首先识别所有临时表
         temp_table_names = set()
+        
+        # 方法1：从CREATE TEMP TABLE语句中识别
         for stmt in sp_structure.sql_statements:
             if stmt.statement_type == SQLStatementType.CREATE_TEMP_TABLE:
                 for table_name in stmt.target_tables:
                     temp_table_names.add(table_name)
+        
+        # 方法2：基于表名包含#判断临时表
+        all_table_names = set()
+        for stmt in sp_structure.sql_statements:
+            all_table_names.update(stmt.source_tables)
+            all_table_names.update(stmt.target_tables)
+        
+        for table_name in all_table_names:
+            if self._is_temp_table_by_name(table_name):
+                temp_table_names.add(table_name)
         
         # 遍历所有SQL语句，构建表和字段信息
         for stmt in sp_structure.sql_statements:
@@ -73,6 +85,32 @@ class TableFieldAnalyzer:
             temp_tables=temp_tables,
             field_lineage=field_lineage
         )
+    
+    def _is_temp_table_by_name(self, table_name: str) -> bool:
+        """基于表名判断是否为临时表"""
+        if not table_name:
+            return False
+            
+        # 检查表名是否包含#（临时表的典型标志）
+        if '#' in table_name:
+            return True
+            
+        # 检查是否以temp_开头
+        if table_name.lower().startswith('temp_'):
+            return True
+            
+        # 检查是否以tmp_开头
+        if table_name.lower().startswith('tmp_'):
+            return True
+            
+        # 如果是schema.table格式，检查table部分
+        if '.' in table_name:
+            parts = table_name.split('.')
+            if len(parts) == 2:
+                schema, table_part = parts
+                return self._is_temp_table_by_name(table_part)
+        
+        return False
     
     def _add_fields_to_tables(self, stmt, physical_tables: Dict[str, Table], temp_tables: Dict[str, Table]):
         """向表对象添加字段信息"""
