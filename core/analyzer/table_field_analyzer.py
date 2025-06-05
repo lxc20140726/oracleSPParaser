@@ -2,10 +2,16 @@
 # -*- coding: utf-8 -*-
 
 from typing import Dict, List
-from models.data_models import (
-    StoredProcedureStructure, TableFieldAnalysis, Table, 
-    FieldReference, SQLStatementType
-)
+try:
+    from ..models.data_models import (
+        StoredProcedureStructure, TableFieldAnalysis, Table, 
+        FieldReference, SQLStatementType
+    )
+except ImportError:
+    from models.data_models import (
+        StoredProcedureStructure, TableFieldAnalysis, Table, 
+        FieldReference, SQLStatementType
+    )
 
 class TableFieldAnalyzer:
     """表字段分析器 - 分析表和字段的关系，构建表对象"""

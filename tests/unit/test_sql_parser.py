@@ -4,7 +4,7 @@
 import pytest
 from unittest.mock import Mock, patch
 import sqlparse
-from src.parser.sql_parser import SQLParser
+from core.parser.sql_parser import SQLParser
 
 
 class TestSQLParser:

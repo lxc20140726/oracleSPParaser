@@ -9,12 +9,22 @@ from pathlib import Path
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
 
-from parser.sp_parser import StoredProcedureParser
-from analyzer.parameter_analyzer import ParameterAnalyzer
-from analyzer.table_field_analyzer import TableFieldAnalyzer
-from analyzer.condition_analyzer import ConditionAnalyzer
-from visualizer.interactive_visualizer import InteractiveVisualizer
-from models.data_models import StoredProcedureAnalysis
+try:
+    # 尝试相对导入（当作为包使用时）
+    from .parser.sp_parser import StoredProcedureParser
+    from .analyzer.parameter_analyzer import ParameterAnalyzer
+    from .analyzer.table_field_analyzer import TableFieldAnalyzer
+    from .analyzer.condition_analyzer import ConditionAnalyzer
+    from .visualizer.interactive_visualizer import InteractiveVisualizer
+    from .models.data_models import StoredProcedureAnalysis
+except ImportError:
+    # 后备到绝对导入（当直接运行时）
+    from parser.sp_parser import StoredProcedureParser
+    from analyzer.parameter_analyzer import ParameterAnalyzer
+    from analyzer.table_field_analyzer import TableFieldAnalyzer
+    from analyzer.condition_analyzer import ConditionAnalyzer
+    from visualizer.interactive_visualizer import InteractiveVisualizer
+    from models.data_models import StoredProcedureAnalysis
 
 class OracleSPAnalyzer:
     """
@@ -60,10 +70,10 @@ class OracleSPAnalyzer:
         
         # 5. 构建最终分析结果
         analysis_result = StoredProcedureAnalysis(
-            sp_structure=sp_structure,
-            parameters=parameters,
-            table_field_analysis=table_field_analysis,
-            conditions_and_logic=conditions_and_logic
+            sp_structure=sp_structure.model_dump(mode='json'),
+            parameters=[param.model_dump(mode='json') for param in parameters],
+            table_field_analysis=table_field_analysis.model_dump(mode='json'),
+            conditions_and_logic=conditions_and_logic.model_dump(mode='json')
         )
         
         # 6. 生成交互式可视化

@@ -4,7 +4,7 @@
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 import networkx as nx
-from src.visualizer.graph_generator import GraphGenerator
+from core.visualizer.graph_generator import GraphGenerator
 
 
 class TestGraphGenerator:
@@ -187,7 +187,7 @@ class TestGraphGenerator:
         self.generator.graph.add_node('test_table', type='table')
         
         # 模拟pygraphviz可用
-        with patch('src.visualizer.graph_generator.pgv', True):
+        with patch('core.visualizer.graph_generator.pgv', True):
             self.generator._save_graphs()
         
         # 只在有节点的情况下才会调用to_agraph

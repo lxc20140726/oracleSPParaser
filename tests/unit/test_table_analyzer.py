@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import pytest
-from src.analyzer.table_analyzer import TableAnalyzer
+from core.analyzer.table_analyzer import TableAnalyzer
 
 
 class TestTableAnalyzer:

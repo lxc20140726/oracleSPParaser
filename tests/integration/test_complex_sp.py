@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
-from src.main import OracleSPAnalyzer
+from core.main import OracleSPAnalyzer
 
 def test_complex_stored_procedure():
     """测试复杂存储过程分析"""

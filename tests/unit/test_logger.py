@@ -7,7 +7,7 @@ import tempfile
 import os
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
-from src.utils.logger import Logger, get_logger, logger
+from core.utils.logger import Logger, get_logger, logger
 
 
 class TestLogger:

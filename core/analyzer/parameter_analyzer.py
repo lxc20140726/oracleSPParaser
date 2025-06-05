@@ -2,7 +2,10 @@
 # -*- coding: utf-8 -*-
 
 from typing import List
-from models.data_models import StoredProcedureStructure, Parameter
+try:
+    from ..models.data_models import StoredProcedureStructure, Parameter
+except ImportError:
+    from models.data_models import StoredProcedureStructure, Parameter
 
 class ParameterAnalyzer:
     """参数分析器 - 识别和分析存储过程参数的使用情况"""

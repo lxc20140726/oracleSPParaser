@@ -6,7 +6,7 @@ import os
 from unittest.mock import Mock, patch, mock_open
 import tempfile
 from pathlib import Path
-from src.utils.config import Config, config
+from core.utils.config import Config, config
 
 
 class TestConfig:

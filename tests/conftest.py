@@ -17,11 +17,11 @@ from httpx import AsyncClient, ASGITransport
 
 # 设置项目路径
 PROJECT_ROOT = Path(__file__).parent.parent
-SRC_PATH = PROJECT_ROOT / "src"
+CORE_PATH = PROJECT_ROOT / "core"
 BACKEND_PATH = PROJECT_ROOT / "backend"
 
 # 添加路径到sys.path
-sys.path.insert(0, str(SRC_PATH))
+sys.path.insert(0, str(CORE_PATH))
 sys.path.insert(0, str(BACKEND_PATH))
 
 # 导入项目模块
@@ -41,9 +41,9 @@ def event_loop():
     loop.close()
 
 @pytest.fixture(scope="session")
-def src_main_module():
-    """加载src/main.py模块"""
-    return load_module_from_path("src_main", SRC_PATH / "main.py")
+def core_main_module():
+    """加载core/main.py模块"""
+    return load_module_from_path("core_main", CORE_PATH / "main.py")
 
 @pytest.fixture(scope="session")
 def backend_main_module():
@@ -51,9 +51,9 @@ def backend_main_module():
     return load_module_from_path("backend_main", BACKEND_PATH / "main.py")
 
 @pytest.fixture(scope="session")
-def oracle_sp_analyzer(src_main_module):
+def oracle_sp_analyzer(core_main_module):
     """创建OracleSPAnalyzer实例"""
-    return src_main_module.OracleSPAnalyzer()
+    return core_main_module.OracleSPAnalyzer()
 
 @pytest.fixture(scope="session")
 def fastapi_app(backend_main_module):

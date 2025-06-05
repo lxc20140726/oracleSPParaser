@@ -20,8 +20,8 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/yourusername/oracleSPParaser",
-    packages=find_packages(where="src"),
-    package_dir={"": "src"},
+    packages=find_packages(where="core"),
+    package_dir={"": "core"},
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",

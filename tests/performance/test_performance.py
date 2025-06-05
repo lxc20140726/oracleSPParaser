@@ -834,7 +834,7 @@ class TestAPIPerformance:
             "options": {}
         }
         
-        with patch('src.main.OracleSPAnalyzer') as mock_analyzer_class:
+        with patch('core.main.OracleSPAnalyzer') as mock_analyzer_class:
             mock_analyzer = Mock()
             mock_result = Mock()
             mock_result.sp_structure.name = "performance_test"
@@ -883,7 +883,7 @@ class TestAPIPerformance:
             "options": {}
         }
         
-        with patch('src.main.OracleSPAnalyzer') as mock_analyzer_class:
+        with patch('core.main.OracleSPAnalyzer') as mock_analyzer_class:
             mock_analyzer = Mock()
             mock_result = Mock()
             mock_result.sp_structure.name = "concurrent_test"

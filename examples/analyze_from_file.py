@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
-from src.main import OracleSPAnalyzer
+from core.main import OracleSPAnalyzer
 
 def analyze_stored_procedure_from_file(file_path: str):
     """从文件读取存储过程并分析"""

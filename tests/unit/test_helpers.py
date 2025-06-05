@@ -9,7 +9,7 @@ import hashlib
 from unittest.mock import Mock, patch, mock_open
 from pathlib import Path
 from datetime import datetime
-from src.utils.helpers import (
+from core.utils.helpers import (
     ensure_dir, read_file, write_file, read_json, write_json,
     get_file_hash, format_file_size, get_timestamp, sanitize_filename,
     flatten_dict, chunk_list, safe_get, merge_dicts,
@@ -198,7 +198,7 @@ class TestHelpers:
         """测试格式化TB大小"""
         assert format_file_size(1024 * 1024 * 1024 * 1024) == "1.0TB"
         
-    @patch('src.utils.helpers.datetime')
+    @patch('core.utils.helpers.datetime')
     def test_get_timestamp_default_format(self, mock_datetime):
         """测试获取默认格式时间戳"""
         mock_now = Mock()
@@ -210,7 +210,7 @@ class TestHelpers:
         assert result == "2023-06-04 15:30:45"
         mock_now.strftime.assert_called_once_with("%Y-%m-%d %H:%M:%S")
         
-    @patch('src.utils.helpers.datetime')
+    @patch('core.utils.helpers.datetime')
     def test_get_timestamp_custom_format(self, mock_datetime):
         """测试获取自定义格式时间戳"""
         mock_now = Mock()

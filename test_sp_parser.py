@@ -8,12 +8,12 @@ import json
 
 # 添加src目录到Python路径
 current_dir = Path(__file__).parent
-sys.path.insert(0, str(current_dir / 'src'))
+sys.path.insert(0, str(current_dir / 'core'))
 
-from parser.sp_parser import StoredProcedureParser
-from analyzer.parameter_analyzer import ParameterAnalyzer
-from analyzer.table_field_analyzer import TableFieldAnalyzer
-from analyzer.condition_analyzer import ConditionAnalyzer
+from core.parser.sp_parser import StoredProcedureParser
+from core.analyzer.parameter_analyzer import ParameterAnalyzer
+from core.analyzer.table_field_analyzer import TableFieldAnalyzer
+from core.analyzer.condition_analyzer import ConditionAnalyzer
 
 def test_large_stored_procedure():
     """测试大型存储过程的解析能力"""

@@ -4,10 +4,16 @@
 import sqlparse
 import re
 from typing import List, Dict, Any
-from models.data_models import (
-    StoredProcedureStructure, SQLStatement, SQLStatementType, 
-    Parameter, FieldReference, JoinCondition, WhereCondition
-)
+try:
+    from ..models.data_models import (
+        StoredProcedureStructure, SQLStatement, SQLStatementType, 
+        Parameter, FieldReference, JoinCondition, WhereCondition
+    )
+except ImportError:
+    from models.data_models import (
+        StoredProcedureStructure, SQLStatement, SQLStatementType, 
+        Parameter, FieldReference, JoinCondition, WhereCondition
+    )
 
 class StoredProcedureParser:
     """

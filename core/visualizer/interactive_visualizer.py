@@ -4,9 +4,14 @@
 import json
 import networkx as nx
 from typing import Dict, List, Any
-from models.data_models import (
-    StoredProcedureAnalysis, VisualizationNode, VisualizationEdge
-)
+try:
+    from ..models.data_models import (
+        StoredProcedureAnalysis, VisualizationNode, VisualizationEdge
+    )
+except ImportError:
+    from models.data_models import (
+        StoredProcedureAnalysis, VisualizationNode, VisualizationEdge
+    )
 
 class InteractiveVisualizer:
     """交互式可视化器 - 生成可视化数据和简单的图形输出"""

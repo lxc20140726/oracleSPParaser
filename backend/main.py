@@ -6,9 +6,9 @@ import os
 from pathlib import Path
 from datetime import datetime
 
-# 添加src路径
-src_path = Path(__file__).parent.parent / "src"
-sys.path.insert(0, str(src_path))
+# 添加core路径
+core_path = Path(__file__).parent.parent / "core"
+sys.path.insert(0, str(core_path))
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,12 +19,12 @@ from typing import List, Dict, Any, Optional
 import json
 import logging
 
-# 修复导入：明确从src目录导入，避免与当前文件名冲突
+# 修复导入：明确从core目录导入，避免与当前文件名冲突
 import importlib.util
-spec = importlib.util.spec_from_file_location("src_main", src_path / "main.py")
-src_main = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(src_main)
-OracleSPAnalyzer = src_main.OracleSPAnalyzer
+spec = importlib.util.spec_from_file_location("core_main", core_path / "main.py")
+core_main = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(core_main)
+OracleSPAnalyzer = core_main.OracleSPAnalyzer
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)

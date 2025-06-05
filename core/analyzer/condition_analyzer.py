@@ -2,10 +2,16 @@
 # -*- coding: utf-8 -*-
 
 from typing import List, Dict, Any
-from models.data_models import (
-    StoredProcedureStructure, ConditionsAndLogic, 
-    JoinCondition, WhereCondition, SQLStatementType
-)
+try:
+    from ..models.data_models import (
+        StoredProcedureStructure, ConditionsAndLogic, 
+        JoinCondition, WhereCondition, SQLStatementType
+    )
+except ImportError:
+    from models.data_models import (
+        StoredProcedureStructure, ConditionsAndLogic, 
+        JoinCondition, WhereCondition, SQLStatementType
+    )
 
 class ConditionAnalyzer:
     """条件分析器 - 分析匹配条件和SQL逻辑"""

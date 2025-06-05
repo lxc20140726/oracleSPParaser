@@ -3,7 +3,7 @@
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from src.analyzer.metadata_expander import MetadataExpander
+from core.analyzer.metadata_expander import MetadataExpander
 
 
 class TestMetadataExpander:
@@ -84,7 +84,7 @@ class TestMetadataExpander:
         # 应该没有添加任何元数据
         assert expander.expanded_metadata == {}
         
-    @patch('src.analyzer.metadata_expander.cx_Oracle')
+    @patch('core.analyzer.metadata_expander.cx_Oracle')
     def test_expand_table_metadata_with_db_error(self, mock_cx_oracle):
         """测试数据库错误时的_expand_table_metadata方法"""
         mock_cx_oracle.Error = Exception  # 模拟cx_Oracle.Error
@@ -125,7 +125,7 @@ class TestMetadataExpander:
             'references_column': 'PARENT_COL'
         }
         
-    @patch('src.analyzer.metadata_expander.cx_Oracle')
+    @patch('core.analyzer.metadata_expander.cx_Oracle')
     def test_get_foreign_keys_with_db_error(self, mock_cx_oracle):
         """测试数据库错误时的_get_foreign_keys方法"""
         mock_cx_oracle.Error = Exception  # 模拟cx_Oracle.Error
