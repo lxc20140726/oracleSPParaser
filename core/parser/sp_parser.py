@@ -500,7 +500,7 @@ class StoredProcedureParser:
             if select_match:
                 select_clause = select_match.group(1)
                 # 提取字段引用
-                field_refs = self._parse_select_fields(select_clause)
+                field_refs = self._parse_select_fields_with_aliases(select_clause, sql_text)
                 fields_read.extend(field_refs)
         
         if stmt_type == SQLStatementType.INSERT:
@@ -521,24 +521,8 @@ class StoredProcedureParser:
         """解析SELECT子句中的字段"""
         field_refs = []
         
-        # 分割字段（简单处理，不考虑函数中的逗号）
-        fields = []
-        paren_count = 0
-        current_field = ""
-        
-        for char in select_clause:
-            if char == '(':
-                paren_count += 1
-            elif char == ')':
-                paren_count -= 1
-            elif char == ',' and paren_count == 0:
-                fields.append(current_field.strip())
-                current_field = ""
-                continue
-            current_field += char
-        
-        if current_field.strip():
-            fields.append(current_field.strip())
+        # 分割字段（处理复杂表达式中的逗号）
+        fields = self._smart_split_fields(select_clause)
         
         # 解析每个字段
         for field in fields:
@@ -546,13 +530,189 @@ class StoredProcedureParser:
             if not field or field == '*':
                 continue
                 
+            # 解析简单字段引用和复杂表达式
+            field_references = self._parse_field_expression(field)
+            field_refs.extend(field_references)
+        
+        return field_refs
+    
+    def _smart_split_fields(self, select_clause: str) -> List[str]:
+        """智能分割字段，考虑表达式中的逗号"""
+        fields = []
+        paren_count = 0
+        quote_count = 0
+        current_field = ""
+        
+        i = 0
+        while i < len(select_clause):
+            char = select_clause[i]
+            
+            if char == '(':
+                paren_count += 1
+            elif char == ')':
+                paren_count -= 1
+            elif char == "'":
+                quote_count = 1 - quote_count
+            elif char == ',' and paren_count == 0 and quote_count == 0:
+                fields.append(current_field.strip())
+                current_field = ""
+                i += 1
+                continue
+            
+            current_field += char
+            i += 1
+        
+        if current_field.strip():
+            fields.append(current_field.strip())
+        
+        return fields
+    
+    def _parse_field_expression(self, field_expr: str) -> List[FieldReference]:
+        """解析字段表达式，支持复杂表达式如 e.first_name || ' ' || e.last_name"""
+        field_refs = []
+        
+        # 检查是否包含连接符 || 
+        if '||' in field_expr:
+            # 这是一个复杂表达式，提取其中的所有字段引用
+            field_refs.extend(self._extract_fields_from_expression(field_expr))
+        else:
+            # 简单字段引用
             # 匹配 schema.table.field 或 table.field 格式，支持带#的临时表
             table_field_pattern = r'(\w+\.(?:#)?\w+|\w+)\.(\w+)'
-            match = re.search(table_field_pattern, field)
+            match = re.search(table_field_pattern, field_expr)
             if match:
                 field_refs.append(FieldReference(
                     table_name=match.group(1),
                     field_name=match.group(2)
+                ))
+        
+        return field_refs
+    
+    def _parse_select_fields_with_aliases(self, select_clause: str, full_sql: str) -> List[FieldReference]:
+        """解析SELECT字段，考虑表别名映射"""
+        field_refs = []
+        
+        # 先提取表别名映射
+        alias_mapping = self._extract_table_aliases(full_sql)
+        
+        # 按逗号分割字段
+        fields = self._split_select_fields_by_comma(select_clause)
+        
+        # 解析每个字段
+        for field_expr in fields:
+            field_expr = field_expr.strip()
+            if not field_expr or field_expr == '*':
+                continue
+            
+            # 提取字段引用，支持复合表达式
+            refs = self._extract_field_references_from_expression(field_expr, alias_mapping)
+            field_refs.extend(refs)
+        
+        return field_refs
+    
+    def _split_select_fields_by_comma(self, select_clause: str) -> List[str]:
+        """按逗号分割SELECT字段，考虑括号和引号"""
+        fields = []
+        current_field = ""
+        paren_count = 0
+        in_quotes = False
+        quote_char = None
+        
+        for char in select_clause:
+            if char in ("'", '"') and not in_quotes:
+                in_quotes = True
+                quote_char = char
+            elif char == quote_char and in_quotes:
+                in_quotes = False
+                quote_char = None
+            elif char == '(' and not in_quotes:
+                paren_count += 1
+            elif char == ')' and not in_quotes:
+                paren_count -= 1
+            elif char == ',' and paren_count == 0 and not in_quotes:
+                fields.append(current_field.strip())
+                current_field = ""
+                continue
+            
+            current_field += char
+        
+        if current_field.strip():
+            fields.append(current_field.strip())
+        
+        return fields
+    
+    def _extract_table_aliases(self, sql_text: str) -> Dict[str, str]:
+        """提取表别名映射 alias -> table_name"""
+        alias_mapping = {}
+        
+        # 匹配FROM子句中的表别名
+        from_pattern = r'FROM\s+(.*?)(?:\s+WHERE|\s+GROUP|\s+ORDER|\s+HAVING|\s*;|\s*$)'
+        from_match = re.search(from_pattern, sql_text, re.IGNORECASE | re.DOTALL)
+        
+        if from_match:
+            from_clause = from_match.group(1)
+            
+            # 处理JOIN之前的主表
+            main_table_pattern = r'(\w+)\s+(\w+)(?:\s+(?:LEFT|RIGHT|INNER|FULL|CROSS)?\s*JOIN|$)'
+            main_match = re.search(main_table_pattern, from_clause, re.IGNORECASE)
+            if main_match:
+                table_name = main_match.group(1)
+                alias = main_match.group(2)
+                if alias.upper() not in ('LEFT', 'RIGHT', 'INNER', 'FULL', 'CROSS', 'JOIN'):
+                    alias_mapping[alias] = table_name
+            
+            # 处理JOIN中的表
+            join_pattern = r'JOIN\s+(\w+)\s+(\w+)\s+ON'
+            join_matches = re.finditer(join_pattern, from_clause, re.IGNORECASE)
+            for match in join_matches:
+                table_name = match.group(1)
+                alias = match.group(2)
+                alias_mapping[alias] = table_name
+        
+        return alias_mapping
+    
+    def _extract_field_references_from_expression(self, expression: str, alias_mapping: Dict[str, str]) -> List[FieldReference]:
+        """从表达式中提取字段引用，使用别名映射转换为实际表名"""
+        field_refs = []
+        
+        # 匹配 alias.field_name 模式
+        field_pattern = r'(\w+)\.(\w+)'
+        matches = re.finditer(field_pattern, expression)
+        
+        for match in matches:
+            alias = match.group(1)
+            field_name = match.group(2)
+            
+            # 将别名转换为实际表名
+            table_name = alias_mapping.get(alias, alias)
+            
+            # 验证是否为有效的字段名
+            if self._looks_like_field_name(field_name):
+                field_refs.append(FieldReference(
+                    table_name=table_name,
+                    field_name=field_name,
+                    alias=alias if alias != table_name else None
+                ))
+        
+        return field_refs
+    
+    def _extract_fields_from_expression(self, expression: str) -> List[FieldReference]:
+        """从复杂表达式中提取所有字段引用"""
+        field_refs = []
+        
+        # 匹配表达式中的所有 table.field 引用
+        table_field_pattern = r'(\w+)\.(\w+)'
+        matches = re.finditer(table_field_pattern, expression)
+        
+        for match in matches:
+            table_name = match.group(1)
+            field_name = match.group(2)
+            
+            # 过滤掉明显不是字段名的词（如函数名等）
+            if self._looks_like_field_name(field_name):
+                field_refs.append(FieldReference(
+                    table_name=table_name,
+                    field_name=field_name
                 ))
         
         return field_refs
