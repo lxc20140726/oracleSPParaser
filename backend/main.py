@@ -4,6 +4,7 @@
 import sys
 import os
 from pathlib import Path
+from datetime import datetime
 
 # 添加src路径
 src_path = Path(__file__).parent.parent / "src"
@@ -49,91 +50,76 @@ app.add_middleware(
 
 # 挂载静态文件服务（仅在目录存在时）
 # 尝试多个可能的静态文件路径
-static_paths = [
-    Path(__file__).parent / "static" / "static",  # 部署环境：backend/static/static (React构建结构)
-    Path(__file__).parent / "static",  # 部署环境：backend/static
+static_js_css_paths = [
+    Path(__file__).parent / "static" / "static",  # 部署环境：backend/static/static (React构建的JS/CSS)
     Path(__file__).parent.parent / "frontend" / "build" / "static",  # 开发环境
     Path(__file__).parent.parent / "static" / "static",  # 根目录static/static
-    Path(__file__).parent.parent / "static",  # 根目录static
 ]
 
-build_paths = [
+# 用于服务manifest.json, favicon.ico等根级文件的路径
+root_assets_paths = [
     Path(__file__).parent / "static",  # 部署环境：backend/static
     Path(__file__).parent.parent / "frontend" / "build",  # 开发环境
     Path(__file__).parent.parent / "static",  # 根目录static
 ]
 
-# 挂载静态资源目录（CSS和JS文件）
+# 挂载静态资源目录（CSS和JS文件）- 映射到 /static
 static_mounted = False
-for static_dir in static_paths:
+for static_dir in static_js_css_paths:
     if static_dir.exists() and (static_dir / "js").exists():
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-        logger.info(f"✅ 挂载静态文件目录: {static_dir}")
+        logger.info(f"✅ 挂载JS/CSS文件目录到 /static: {static_dir}")
         static_mounted = True
         break
 
 if not static_mounted:
-    logger.warning("⚠️ 未找到有效的静态文件目录")
-    # 调试信息：打印尝试的路径
-    for static_dir in static_paths:
-        logger.debug(f"尝试路径: {static_dir}, 存在: {static_dir.exists()}, 包含js: {(static_dir / 'js').exists() if static_dir.exists() else False}")
+    logger.warning("⚠️ 未找到有效的JS/CSS静态文件目录")
 
-# 挂载构建目录中的其他文件（manifest.json, favicon.ico等）
-build_mounted = False
-for build_dir in build_paths:
-    if build_dir.exists() and (build_dir / "index.html").exists():
-        app.mount("/assets", StaticFiles(directory=str(build_dir)), name="assets")
-        logger.info(f"✅ 挂载构建文件目录: {build_dir}")
-        build_mounted = True
+# 挂载根级资源目录（manifest.json, favicon.ico等）- 映射到 /assets
+assets_mounted = False
+for assets_dir in root_assets_paths:
+    if assets_dir.exists() and (assets_dir / "index.html").exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+        logger.info(f"✅ 挂载根级资源目录到 /assets: {assets_dir}")
+        assets_mounted = True
         break
 
-if not build_mounted:
-    logger.warning("⚠️ 未找到有效的构建文件目录")
-    # 调试信息：打印尝试的路径
-    for build_dir in build_paths:
-        logger.debug(f"尝试路径: {build_dir}, 存在: {build_dir.exists()}, 包含index.html: {(build_dir / 'index.html').exists() if build_dir.exists() else False}")
+if not assets_mounted:
+    logger.warning("⚠️ 未找到有效的根级资源目录")
 
-# 添加对根目录静态文件的支持
+# 直接提供manifest.json (因为HTML中引用的是 /manifest.json)
 @app.get("/manifest.json")
-async def manifest():
+async def serve_manifest():
     """提供manifest.json文件"""
     try:
-        # 尝试多个可能的路径
-        manifest_paths = [
-            Path(__file__).parent / "static" / "manifest.json",  # 部署环境
-            Path(__file__).parent.parent / "frontend" / "build" / "manifest.json",  # 开发环境
-            Path(__file__).parent.parent / "static" / "manifest.json",  # 根目录static
-        ]
-        
-        for manifest_path in manifest_paths:
+        for assets_dir in root_assets_paths:
+            manifest_path = assets_dir / "manifest.json"
             if manifest_path.exists():
+                logger.info(f"✅ 提供manifest.json: {manifest_path}")
                 with open(manifest_path, 'r', encoding='utf-8') as f:
                     return json.load(f)
         
+        logger.warning("⚠️ 找不到manifest.json文件")
         raise HTTPException(status_code=404, detail="manifest.json not found")
     except Exception as e:
-        logger.error(f"Error serving manifest.json: {e}")
+        logger.error(f"提供manifest.json时出错: {e}")
         raise HTTPException(status_code=404, detail="manifest.json not found")
 
+# 直接提供favicon.ico (因为HTML中引用的是 /favicon.ico)
 @app.get("/favicon.ico")
-async def favicon():
+async def serve_favicon():
     """提供favicon文件"""
     try:
-        # 尝试多个可能的路径
-        favicon_paths = [
-            Path(__file__).parent / "static" / "favicon.ico",  # 部署环境
-            Path(__file__).parent.parent / "frontend" / "public" / "favicon.ico",  # 开发环境public
-            Path(__file__).parent.parent / "frontend" / "build" / "favicon.ico",  # 开发环境build
-            Path(__file__).parent.parent / "static" / "favicon.ico",  # 根目录static
-        ]
-        
-        for favicon_path in favicon_paths:
+        for assets_dir in root_assets_paths:
+            favicon_path = assets_dir / "favicon.ico"
             if favicon_path.exists():
+                logger.info(f"✅ 提供favicon.ico: {favicon_path}")
                 return FileResponse(favicon_path)
         
+        logger.warning("⚠️ 找不到favicon.ico文件")
         raise HTTPException(status_code=404, detail="favicon.ico not found")
     except Exception as e:
-        logger.error(f"Error serving favicon.ico: {e}")
+        logger.error(f"提供favicon.ico时出错: {e}")
         raise HTTPException(status_code=404, detail="favicon.ico not found")
 
 # 请求模型
@@ -154,14 +140,9 @@ analyzer = OracleSPAnalyzer()
 async def root():
     """首页"""
     try:
-        # 尝试多个可能的index.html路径
-        index_paths = [
-            Path(__file__).parent / "static" / "index.html",  # 部署环境
-            Path(__file__).parent.parent / "frontend" / "build" / "index.html",  # 开发环境
-            Path(__file__).parent.parent / "static" / "index.html",  # 根目录static
-        ]
-        
-        for index_path in index_paths:
+        # 使用相同的路径查找index.html
+        for assets_dir in root_assets_paths:
+            index_path = assets_dir / "index.html"
             if index_path.exists():
                 logger.info(f"✅ 使用前端文件: {index_path}")
                 return index_path.read_text(encoding='utf-8')
@@ -206,12 +187,18 @@ async def root():
                         <li><a href="/api/health" target="_blank">💚 健康检查</a></li>
                     </ul>
                 </div>
+                
+                <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                    <h4>🔧 调试信息</h4>
+                    <p>如果您是开发者，可以检查控制台日志获取更多信息。</p>
+                    <p>当前时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                </div>
             </div>
         </body>
         </html>
         """
     except Exception as e:
-        logger.error(f"Error serving root page: {e}")
+        logger.error(f"提供根页面时出错: {e}")
         return "<h1>Oracle存储过程分析工具</h1><p>服务正在启动...</p>"
 
 @app.get("/api/health")

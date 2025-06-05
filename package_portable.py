@@ -221,7 +221,7 @@ npm run build</pre>
                 print(f"  ✅ 已复制 {src_dir}/")
         
         # 复制配置文件
-        config_files = ["requirements.txt", "README.md", "START_GUIDE.md"]
+        config_files = ["requirements.txt", "README.md", "START_GUIDE.md", "diagnose_deployment.py"]
         for config_file in config_files:
             src_file = self.project_root / config_file
             if src_file.exists():

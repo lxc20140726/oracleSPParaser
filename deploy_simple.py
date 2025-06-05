@@ -127,10 +127,11 @@ def create_simple_package():
             f.write(fallback_html)
     
     # 复制配置和文档
-    for file_name in ["requirements.txt", "README.md", "START_GUIDE.md"]:
+    for file_name in ["requirements.txt", "README.md", "START_GUIDE.md", "diagnose_deployment.py"]:
         src_file = project_root / file_name
         if src_file.exists():
             shutil.copy2(src_file, package_dir)
+            print(f"  ✅ 已复制 {file_name}")
     
     # 复制示例数据（如果存在且不太大）
     for data_dir in ["data", "examples"]:
