@@ -16,7 +16,14 @@ export interface SqlStatement {
 
 export interface Table {
   fields: string[];
+  computed_fields?: ComputedField[];
   source_sql_ids: string[];
+}
+
+export interface ComputedField {
+  name: string;
+  expression: string;
+  source_fields: string[];
 }
 
 export interface JoinCondition {
@@ -81,6 +88,89 @@ export interface AnalysisResult {
   message: string;
   data: AnalysisData;
   visualization: VisualizationData;
+  uml_visualization?: UMLVisualizationData;
+}
+
+export interface UMLVisualizationData {
+  visualization_type: "uml";
+  nodes: UMLNode[];
+  field_mappings: UMLEdge[];
+  table_relations: UMLEdge[];
+  metadata: {
+    procedure_name: string;
+    total_tables: number;
+    field_mappings_count: number;
+    table_relations_count: number;
+    physical_tables: number;
+    temp_tables: number;
+  };
+}
+
+export interface UMLNode {
+  id: string;
+  label: string;
+  type: string;
+  properties: UMLNodeProperties;
+}
+
+export interface UMLNodeProperties {
+  table_name: string;
+  fields: UMLField[];
+  field_count: number;
+  color: string;
+  border_style: string;
+  is_temporary: boolean;
+  shape: string;
+  width: number;
+  height: number;
+  field_layout?: {
+    header_height: number;
+    field_height: number;
+    padding: number;
+  };
+  sql_ids?: string[];
+  selected_field?: {
+    name: string;
+    type: string;
+    index: number;
+    is_computed: boolean;
+    expression?: string;
+  };
+}
+
+export interface UMLField {
+  name: string;
+  type: "field" | "computed_field";
+  source?: string;
+  expression?: string;
+  source_fields?: string[];
+}
+
+export interface UMLEdge {
+  source: string;
+  target: string;
+  label: string;
+  type: string;
+  properties: {
+    id?: string;
+    source_table?: string;
+    source_field?: string;
+    target_table?: string;
+    target_field?: string;
+    mapping_type?: string;
+    expression?: string;
+    relation_type?: string;
+    left_field?: string;
+    right_field?: string;
+    condition?: string;
+    style: string;
+    color: string;
+    source_field_index?: number;
+    target_field_index?: number;
+    connection_style?: string;
+    width?: string;
+    arrow_type?: string;
+  };
 }
 
 export interface AnalyzeRequest {

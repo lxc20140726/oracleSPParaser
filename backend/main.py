@@ -313,6 +313,107 @@ async def analyze_file(file: UploadFile = File(...)):
         logger.error(f"文件分析错误: {str(e)}")
         raise HTTPException(status_code=500, detail=f"文件分析失败: {str(e)}")
 
+@app.post("/api/analyze/uml")
+async def analyze_with_uml(request: AnalyzeRequest):
+    """分析存储过程并返回UML样式可视化数据"""
+    try:
+        logger.info("开始分析存储过程（UML模式）")
+        
+        # 验证输入
+        if not request.stored_procedure.strip():
+            raise HTTPException(status_code=400, detail="存储过程内容不能为空")
+        
+        # 执行分析
+        result = analyzer.analyze(request.stored_procedure)
+        
+        # 获取UML可视化数据
+        uml_data = analyzer.uml_visualizer.create_uml_visualization(result)
+        
+        # 转换为标准可视化数据（保持兼容性）
+        standard_visualization = convert_to_visualization_data(result)
+        
+        # 构建响应数据
+        response_data = {
+            "procedure_name": result.sp_structure.name,
+            "parameters": [
+                {
+                    "name": p.name,
+                    "direction": p.direction,
+                    "data_type": p.data_type,
+                    "used_in_statements": p.used_in_statements
+                } for p in result.parameters
+            ],
+            "sql_statements": [
+                {
+                    "id": stmt.statement_id,
+                    "type": stmt.statement_type.value,
+                    "raw_sql": stmt.raw_sql,
+                    "source_tables": stmt.source_tables,
+                    "target_tables": stmt.target_tables,
+                    "parameters_used": stmt.parameters_used
+                } for stmt in result.sp_structure.sql_statements
+            ],
+            "tables": {
+                "physical": {
+                    name: {
+                        "fields": table.fields,
+                        "computed_fields": [
+                            {
+                                "name": cf.target_field_name or cf.alias or "computed_field",
+                                "expression": cf.expression,
+                                "source_fields": [f"{ref.table_name}.{ref.field_name}" for ref in cf.component_fields]
+                            } for cf in table.computed_fields
+                        ],
+                        "source_sql_ids": table.source_sql_ids
+                    } for name, table in result.table_field_analysis.physical_tables.items()
+                },
+                "temporary": {
+                    name: {
+                        "fields": table.fields,
+                        "computed_fields": [
+                            {
+                                "name": cf.target_field_name or cf.alias or "computed_field",
+                                "expression": cf.expression,
+                                "source_fields": [f"{ref.table_name}.{ref.field_name}" for ref in cf.component_fields]
+                            } for cf in table.computed_fields
+                        ],
+                        "source_sql_ids": table.source_sql_ids
+                    } for name, table in result.table_field_analysis.temp_tables.items()
+                }
+            },
+            "join_conditions": [
+                {
+                    "left_table": jc.left_table,
+                    "left_field": jc.left_field,
+                    "right_table": jc.right_table,
+                    "right_field": jc.right_field,
+                    "join_type": jc.join_type,
+                    "condition_text": jc.condition_text
+                } for jc in result.conditions_and_logic.join_conditions
+            ],
+            "statistics": {
+                "parameter_count": len(result.parameters),
+                "sql_statement_count": len(result.sp_structure.sql_statements),
+                "physical_table_count": len(result.table_field_analysis.physical_tables),
+                "temporary_table_count": len(result.table_field_analysis.temp_tables),
+                "join_condition_count": len(result.conditions_and_logic.join_conditions)
+            }
+        }
+        
+        logger.info(f"UML分析完成: {result.sp_structure.name}")
+        
+        return {
+            "success": True,
+            "message": f"成功分析存储过程 '{result.sp_structure.name}' (UML模式)",
+            "data": response_data,
+            "visualization": standard_visualization,
+            "uml_visualization": uml_data
+        }
+        
+    except Exception as e:
+        logger.error(f"UML分析过程中发生错误: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"UML分析失败: {str(e)}")
+
 def convert_to_visualization_data(result) -> Dict[str, Any]:
     """转换分析结果为可视化数据格式"""
     nodes = []

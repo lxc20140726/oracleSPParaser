@@ -267,12 +267,39 @@ class TableFieldAnalyzer:
     
     def _handle_simple_field_mapping(self, field_expr: str, target_table: str, target_field: str, all_tables: Dict[str, Table]):
         """处理简单字段映射"""
-        # 匹配 alias.field_name 格式
-        field_pattern = r'(\w+)\.(\w+)'
-        match = re.search(field_pattern, field_expr)
+        field_expr = field_expr.strip()
         
-        if match and target_table in all_tables:
-            # 只需要在目标表中添加字段
+        # 提取表别名映射
+        alias_mapping = self._extract_table_aliases_from_sql("")  # 这里可以改进
+        
+        # 解析字段引用
+        table_field_match = re.match(r'(\w+)\.(\w+)', field_expr)
+        if table_field_match:
+            table_alias = table_field_match.group(1)
+            field_name = table_field_match.group(2)
+            
+            # 解析实际表名
+            if table_alias in alias_mapping:
+                real_table_name = alias_mapping[table_alias]
+            else:
+                # 如果没有找到别名映射，尝试直接匹配表名
+                real_table_name = None
+                for table_name in all_tables.keys():
+                    if table_alias.lower() in table_name.lower() or table_name.lower().startswith(table_alias.lower()):
+                        real_table_name = table_name
+                        break
+                if not real_table_name:
+                    real_table_name = table_alias  # 作为最后的回退
+            
+            # 添加字段到源表
+            if real_table_name in all_tables:
+                all_tables[real_table_name].add_field(field_name)
+                print(f"✅ 添加字段 {field_name} 到表 {real_table_name}")
+            else:
+                print(f"⚠️  未找到表 {real_table_name} (原别名: {table_alias})")
+        
+        # 添加目标字段到目标表
+        if target_table in all_tables:
             all_tables[target_table].add_field(target_field)
     
     def _extract_table_aliases_from_sql(self, sql_text: str) -> Dict[str, str]:

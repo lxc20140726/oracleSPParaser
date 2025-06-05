@@ -16,6 +16,7 @@ try:
     from .analyzer.table_field_analyzer import TableFieldAnalyzer
     from .analyzer.condition_analyzer import ConditionAnalyzer
     from .visualizer.interactive_visualizer import InteractiveVisualizer
+    from .visualizer.uml_visualizer import UMLVisualizer
     from .models.data_models import StoredProcedureAnalysis
 except ImportError:
     # 后备到绝对导入（当直接运行时）
@@ -24,6 +25,7 @@ except ImportError:
     from analyzer.table_field_analyzer import TableFieldAnalyzer
     from analyzer.condition_analyzer import ConditionAnalyzer
     from visualizer.interactive_visualizer import InteractiveVisualizer
+    from visualizer.uml_visualizer import UMLVisualizer
     from models.data_models import StoredProcedureAnalysis
 
 class OracleSPAnalyzer:
@@ -38,6 +40,7 @@ class OracleSPAnalyzer:
         self.table_field_analyzer = TableFieldAnalyzer()
         self.condition_analyzer = ConditionAnalyzer()
         self.visualizer = InteractiveVisualizer()
+        self.uml_visualizer = UMLVisualizer()
 
     def analyze(self, sp_text: str) -> StoredProcedureAnalysis:
         """
@@ -78,6 +81,9 @@ class OracleSPAnalyzer:
         
         # 6. 生成交互式可视化
         self.visualizer.create_interactive_visualization(analysis_result)
+        
+        # 7. 生成UML样式可视化
+        uml_data = self.uml_visualizer.create_uml_visualization(analysis_result)
         
         return analysis_result
 

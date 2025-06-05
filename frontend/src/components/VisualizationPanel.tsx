@@ -17,8 +17,19 @@ const VisualizationPanel: React.FC<VisualizationPanelProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const layoutRef = useRef<any>(null);
+  const isMountedRef = useRef(true);
   const [selectedNode, setSelectedNode] = useState<VisualizationNode | null>(null);
   const [showLegend, setShowLegend] = useState(true);
+
+  // 组件挂载状态管理
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // 克莱因蓝主题的Cytoscape样式配置 - 使用useMemo优化
   const cytoscapeStyle = useMemo(() => [
@@ -177,40 +188,76 @@ const VisualizationPanel: React.FC<VisualizationPanelProps> = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    cyRef.current = cytoscape({
-      container: containerRef.current,
-      style: cytoscapeStyle,
-      layout: {
-        name: 'cose',
-        animate: true,
-        animationDuration: 1200,
-        randomize: false,
-        nodeRepulsion: () => 8000,
-        idealEdgeLength: () => 80,
-        edgeElasticity: () => 200,
-      },
-      minZoom: 0.1,
-      maxZoom: 4,
-      wheelSensitivity: 0.15,
-    });
+    try {
+      cyRef.current = cytoscape({
+        container: containerRef.current,
+        style: cytoscapeStyle,
+        layout: {
+          name: 'preset',  // 使用预设布局避免初始动画
+          animate: false,
+          fit: false
+        },
+        minZoom: 0.1,
+        maxZoom: 4,
+        wheelSensitivity: 0.15,
+      });
 
-    // 添加节点点击事件
-    cyRef.current.on('tap', 'node', (event) => {
-      const node = event.target;
-      const nodeData = node.data();
-      setSelectedNode(nodeData);
-    });
+      // 添加节点点击事件
+      cyRef.current.on('tap', 'node', (event) => {
+        try {
+          const node = event.target;
+          const nodeData = node.data();
+          setSelectedNode(nodeData);
+        } catch (error) {
+          console.warn('处理节点点击事件时出错:', error);
+        }
+      });
 
-    // 添加背景点击事件（取消选择）
-    cyRef.current.on('tap', (event) => {
-      if (event.target === cyRef.current) {
-        setSelectedNode(null);
-        cyRef.current?.nodes().unselect();
-      }
-    });
+      // 添加背景点击事件（取消选择）
+      cyRef.current.on('tap', (event) => {
+        try {
+          if (event.target === cyRef.current) {
+            setSelectedNode(null);
+            cyRef.current?.nodes().unselect();
+          }
+        } catch (error) {
+          console.warn('处理背景点击事件时出错:', error);
+        }
+      });
+    } catch (error) {
+      console.error('初始化Cytoscape时出错:', error);
+    }
 
     return () => {
-      cyRef.current?.destroy();
+      isMountedRef.current = false;
+      
+      // 清理定时器
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      
+      // 停止布局
+      if (layoutRef.current) {
+        try {
+          layoutRef.current.stop();
+        } catch (error) {
+          console.warn('停止布局时出错:', error);
+        }
+        layoutRef.current = null;
+      }
+      
+      // 销毁Cytoscape实例
+      if (cyRef.current) {
+        try {
+          cyRef.current.removeAllListeners();
+          cyRef.current.stop();
+          cyRef.current.destroy();
+        } catch (error) {
+          console.warn('销毁Cytoscape实例时出错:', error);
+        }
+        cyRef.current = null;
+      }
     };
   }, [cytoscapeStyle]);
 
@@ -218,78 +265,134 @@ const VisualizationPanel: React.FC<VisualizationPanelProps> = ({
   useEffect(() => {
     if (!cyRef.current || !analysisResult?.visualization) return;
 
-    const { nodes, edges } = analysisResult.visualization;
+    // 清理之前的定时器和布局
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    
+    if (layoutRef.current) {
+      try {
+        layoutRef.current.stop();
+      } catch (error) {
+        console.warn('停止之前的布局时出错:', error);
+      }
+    }
 
-    // 转换数据格式
-    const cytoscapeElements = [
-      ...nodes.map((node) => ({
-        data: {
-          id: node.id,
-          label: node.label,
-          type: node.type,
-          group: node.group,
-          ...node.data,
-        },
-      })),
-      ...edges.map((edge) => ({
-        data: {
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          type: edge.type,
-          label: edge.label,
-          ...edge.data,
-        },
-      })),
-    ];
+    try {
+      const { nodes, edges } = analysisResult.visualization;
 
-    // 更新图数据
-    cyRef.current.elements().remove();
-    cyRef.current.add(cytoscapeElements);
+      // 转换数据格式
+      const cytoscapeElements = [
+        ...nodes.map((node) => ({
+          data: {
+            id: node.id,
+            label: node.label,
+            type: node.type,
+            group: node.group,
+            ...node.data,
+          },
+        })),
+        ...edges.map((edge) => ({
+          data: {
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            type: edge.type,
+            label: edge.label,
+            ...edge.data,
+          },
+        })),
+      ];
 
-    // 重新布局
-    const layout = cyRef.current.layout({
-      name: 'cose',
-      animate: true,
-      animationDuration: 1200,
-      randomize: false,
-      nodeRepulsion: () => 8000,
-      idealEdgeLength: () => 80,
-      edgeElasticity: () => 200,
-    });
+      // 更新图数据
+      cyRef.current.elements().remove();
+      cyRef.current.add(cytoscapeElements);
 
-    layout.run();
+      // 创建新布局（禁用动画以避免异步问题）
+      layoutRef.current = cyRef.current.layout({
+        name: 'cose',
+        animate: false,  // 禁用动画
+        randomize: false,
+        nodeRepulsion: () => 8000,
+        idealEdgeLength: () => 80,
+        edgeElasticity: () => 200,
+        fit: false,  // 禁用自动fit
+        stop: () => {
+          // 布局完成后的回调
+          if (isMountedRef.current && cyRef.current && !cyRef.current.destroyed()) {
+            try {
+              cyRef.current.fit(undefined, 50);
+            } catch (error) {
+              console.warn('布局完成后fit出错:', error);
+            }
+          }
+        }
+      });
 
-    // 适应视图
-    setTimeout(() => {
-      cyRef.current?.fit(undefined, 50);
-    }, 1400);
+      layoutRef.current.run();
+    } catch (error) {
+      console.error('更新图数据时出错:', error);
+    }
+
+    // 清理函数
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      
+      if (layoutRef.current) {
+        try {
+          layoutRef.current.stop();
+        } catch (error) {
+          console.warn('清理布局时出错:', error);
+        }
+        layoutRef.current = null;
+      }
+    };
   }, [analysisResult]);
 
   const handleResetView = () => {
-    cyRef.current?.fit(undefined, 50);
+    try {
+      if (isMountedRef.current && cyRef.current && !cyRef.current.destroyed()) {
+        cyRef.current.fit(undefined, 50);
+      }
+    } catch (error) {
+      console.warn('重置视图时出错:', error);
+    }
   };
 
   const handleCenterSelected = () => {
-    const selected = cyRef.current?.$(':selected');
-    if (selected && selected.length > 0) {
-      cyRef.current?.center(selected);
+    try {
+      if (isMountedRef.current && cyRef.current && !cyRef.current.destroyed()) {
+        const selected = cyRef.current.$(':selected');
+        if (selected && selected.length > 0) {
+          cyRef.current.center(selected);
+        }
+      }
+    } catch (error) {
+      console.warn('居中选中节点时出错:', error);
     }
   };
 
   const handleExportImage = () => {
-    if (cyRef.current) {
-      const png64 = cyRef.current.png({
-        output: 'blob',
-        bg: 'white',
-        full: true,
-        scale: 2,
-      });
-      
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(png64);
-      link.download = 'data-flow-diagram.png';
-      link.click();
+    try {
+      if (isMountedRef.current && cyRef.current && !cyRef.current.destroyed()) {
+        const png64 = cyRef.current.png({
+          output: 'blob',
+          bg: 'white',
+          full: true,
+          scale: 2,
+        });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(png64);
+        link.download = 'data-flow-diagram.png';
+        link.click();
+      }
+    } catch (error) {
+      console.warn('导出图像时出错:', error);
     }
   };
 

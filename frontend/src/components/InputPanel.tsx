@@ -1,12 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { AnalysisResult, AnalyzeRequest } from '../types';
-import { analyzeStoredProcedure, analyzeFile } from '../services/api';
+import { analyzeStoredProcedure, analyzeFile, analyzeWithUML } from '../services/api';
 import toast from 'react-hot-toast';
 
 interface InputPanelProps {
   onAnalysisStart: () => void;
   onAnalysisComplete: (result: AnalysisResult) => void;
   onAnalysisError: () => void;
+  onUMLAnalysisComplete?: (result: AnalysisResult) => void;
   isAnalyzing: boolean;
 }
 
@@ -14,6 +15,7 @@ const InputPanel: React.FC<InputPanelProps> = ({
   onAnalysisStart,
   onAnalysisComplete,
   onAnalysisError,
+  onUMLAnalysisComplete,
   isAnalyzing,
 }) => {
   const [inputText, setInputText] = useState('');
@@ -127,6 +129,40 @@ END;`;
     toast.success('已清空输入内容');
   };
 
+  const handleUMLAnalysis = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!inputText.trim()) {
+      toast.error('请输入存储过程内容');
+      return;
+    }
+
+    try {
+      onAnalysisStart();
+      
+      const request: AnalyzeRequest = {
+        stored_procedure: inputText,
+      };
+
+      const result = await analyzeWithUML(request);
+      
+      if (result.success) {
+        toast.success(`${result.message} - 包含UML结构图`);
+        if (onUMLAnalysisComplete) {
+          onUMLAnalysisComplete(result);
+        } else {
+          onAnalysisComplete(result);
+        }
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error('UML Analysis error:', error);
+      toast.error(error instanceof Error ? error.message : 'UML分析失败，请检查存储过程格式');
+      onAnalysisError();
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* 优雅的头部 */}
@@ -227,29 +263,56 @@ END;`;
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={isAnalyzing || !inputText.trim()}
-                className={`btn w-full ${
-                  isAnalyzing || !inputText.trim()
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'btn-primary'
-                } btn-lg`}
-              >
-                {isAnalyzing ? (
-                  <div className="flex items-center justify-center">
-                    <div className="loader-klein mr-3"></div>
-                    正在分析存储过程...
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center">
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                    开始智能分析
-                  </div>
-                )}
-              </button>
+              <div className="space-y-3">
+                <button
+                  type="submit"
+                  disabled={isAnalyzing || !inputText.trim()}
+                  className={`btn w-full ${
+                    isAnalyzing || !inputText.trim()
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'btn-primary'
+                  } btn-lg`}
+                >
+                  {isAnalyzing ? (
+                    <div className="flex items-center justify-center">
+                      <div className="loader-klein mr-3"></div>
+                      正在分析存储过程...
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center">
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                      开始智能分析
+                    </div>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleUMLAnalysis}
+                  disabled={isAnalyzing || !inputText.trim()}
+                  className={`btn w-full ${
+                    isAnalyzing || !inputText.trim()
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white'
+                  } btn-lg`}
+                >
+                  {isAnalyzing ? (
+                    <div className="flex items-center justify-center">
+                      <div className="loader-klein mr-3"></div>
+                      正在生成UML图...
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center">
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                      UML结构分析
+                    </div>
+                  )}
+                </button>
+              </div>
             </form>
           </div>
         ) : (

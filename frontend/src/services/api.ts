@@ -58,6 +58,25 @@ export const analyzeFile = async (file: File): Promise<AnalysisResult> => {
   }
 };
 
+export const analyzeWithUML = async (request: AnalyzeRequest): Promise<AnalysisResult> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/analyze/uml`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    return handleResponse(response);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('UML分析失败或服务暂时不可用');
+  }
+};
+
 export const healthCheck = async (): Promise<{ status: string; message: string }> => {
   try {
     const response = await fetch(`${API_BASE_URL}/health`);
