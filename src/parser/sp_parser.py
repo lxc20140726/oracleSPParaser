@@ -128,14 +128,40 @@ class StoredProcedureParser:
         """提取SQL语句"""
         statements = []
         
-        # 找到BEGIN...END块
-        begin_pattern = r'BEGIN\s+(.*?)\s+END'
-        match = re.search(begin_pattern, text, re.IGNORECASE | re.DOTALL)
-        
-        if not match:
+        # 找到BEGIN...END块 - 改进匹配方式
+        # 使用更精确的方法匹配完整的存储过程体
+        begin_match = re.search(r'BEGIN\s+', text, re.IGNORECASE)
+        if not begin_match:
             return statements
         
-        body = match.group(1)
+        # 从BEGIN开始，找到匹配的END
+        start_pos = begin_match.end()
+        body = ""
+        
+        # 手动匹配BEGIN/END配对
+        lines = text[start_pos:].split('\n')
+        begin_count = 1  # 已经有一个BEGIN了
+        body_lines = []
+        
+        for line in lines:
+            line_upper = line.upper().strip()
+            
+            # 计算BEGIN和END的配对
+            if line_upper.startswith('BEGIN'):
+                begin_count += 1
+            elif line_upper.startswith('END'):
+                begin_count -= 1
+                
+                # 如果找到匹配的END，停止
+                if begin_count == 0:
+                    break
+            
+            body_lines.append(line)
+        
+        body = '\n'.join(body_lines)
+        
+        if not body.strip():
+            return statements
         
         # 使用改进的SQL语句分割方法
         sql_parts = self._advanced_sql_split(body)
@@ -154,58 +180,193 @@ class StoredProcedureParser:
         """改进的SQL语句分割方法，能处理复杂的控制结构"""
         statements = []
         
-        # 首先使用sqlparse进行基础分割
-        basic_parts = sqlparse.split(body)
+        # 直接扫描整个body，按行提取SQL语句
+        sql_keywords = ['INSERT', 'UPDATE', 'DELETE', 'SELECT', 'MERGE', 'CREATE']
+        lines = body.split('\n')
         
-        # 然后进一步处理包含IF语句等控制结构的部分
+        current_sql = ""
+        in_sql_statement = False
+        paren_count = 0
+        
+        for i, line in enumerate(lines):
+            line_stripped = line.strip()
+            
+            # 检查是否是SQL语句的开始
+            if any(line_stripped.upper().startswith(keyword) for keyword in sql_keywords):
+                # 如果前面有未完成的SQL语句，先保存
+                if current_sql.strip():
+                    statements.append(current_sql.strip())
+                
+                current_sql = line
+                in_sql_statement = True
+                paren_count = line.count('(') - line.count(')')
+                
+            elif in_sql_statement:
+                # 继续当前SQL语句
+                current_sql += "\n" + line
+                paren_count += line.count('(') - line.count(')')
+                
+                # 检查是否是SQL语句的结束
+                is_sql_end = False
+                
+                # 方法1：以分号结束
+                if line_stripped.endswith(';') and paren_count <= 0:
+                    is_sql_end = True
+                
+                # 方法2：遇到控制结构关键字
+                elif any(line_stripped.upper().startswith(kw) for kw in ['IF', 'ELSIF', 'ELSE', 'END', 'WHILE', 'FOR']):
+                    if paren_count <= 0:
+                        current_sql = current_sql.replace(line, "").strip()
+                        is_sql_end = True
+                
+                # 方法3：遇到新的SQL语句
+                elif any(line_stripped.upper().startswith(kw) for kw in sql_keywords):
+                    if paren_count <= 0:
+                        current_sql = current_sql.replace(line, "").strip()
+                        statements.append(current_sql)
+                        current_sql = line
+                        paren_count = line.count('(') - line.count(')')
+                        continue
+                
+                # 方法4：遇到下一行是控制结构或空行，且当前SQL已经完整
+                elif (i + 1 < len(lines) and 
+                      lines[i + 1].strip() and
+                      any(lines[i + 1].strip().upper().startswith(kw) for kw in ['IF', 'ELSIF', 'ELSE', 'END']) and
+                      paren_count <= 0):
+                    is_sql_end = True
+                
+                if is_sql_end:
+                    statements.append(current_sql.strip())
+                    current_sql = ""
+                    in_sql_statement = False
+                    paren_count = 0
+        
+        # 处理最后一个SQL语句
+        if current_sql.strip():
+            statements.append(current_sql.strip())
+        
+        # 使用sqlparse作为备份方法
+        basic_parts = sqlparse.split(body)
         for part in basic_parts:
             if not part.strip():
                 continue
                 
-            # 检查是否包含IF语句
+            # 检查是否包含IF语句，如果是，递归提取
             if re.search(r'\bIF\b.*?\bTHEN\b', part, re.IGNORECASE | re.DOTALL):
-                # 提取IF语句中的SQL
                 if_statements = self._extract_sql_from_if_block(part)
-                statements.extend(if_statements)
+                for stmt in if_statements:
+                    # 避免重复添加
+                    if stmt not in statements and len(stmt) > 10:
+                        statements.append(stmt)
             else:
-                statements.append(part)
+                # 普通语句，直接添加
+                if part not in statements and len(part.strip()) > 10:
+                    statements.append(part.strip())
         
-        return statements
+        # 清理结果
+        cleaned_statements = []
+        for stmt in statements:
+            stmt = stmt.strip()
+            if stmt and len(stmt) > 15:  # 过滤太短的语句
+                # 移除末尾的分号
+                if stmt.endswith(';'):
+                    stmt = stmt[:-1].strip()
+                
+                # 检查是否是有效的SQL语句
+                if any(stmt.upper().startswith(keyword) for keyword in sql_keywords):
+                    # 避免重复
+                    is_duplicate = False
+                    for existing in cleaned_statements:
+                        if stmt[:100] == existing[:100]:  # 比较前100个字符
+                            is_duplicate = True
+                            break
+                    
+                    if not is_duplicate:
+                        cleaned_statements.append(stmt)
+        
+        return cleaned_statements
 
     def _extract_sql_from_if_block(self, if_block: str) -> List[str]:
-        """从IF语句块中提取SQL语句"""
+        """从IF语句块中提取SQL语句 - 改进版，支持复杂嵌套结构"""
         sql_statements = []
         
-        # 首先尝试提取简单的IF...THEN...END IF结构
-        if_pattern = r'IF\s+.*?\s+THEN\s+(.*?)(?:\s+END\s+IF|\s*$)'
-        matches = re.finditer(if_pattern, if_block, re.IGNORECASE | re.DOTALL)
+        # 方法1：直接搜索SQL关键字，不依赖IF结构解析
+        sql_keywords = ['INSERT', 'UPDATE', 'DELETE', 'SELECT', 'MERGE', 'CREATE']
+        lines = if_block.split('\n')
         
-        for match in matches:
-            then_block = match.group(1).strip()
-            if then_block:
-                # 递归分割THEN块中的语句
-                nested_statements = sqlparse.split(then_block)
-                for stmt in nested_statements:
-                    stmt = stmt.strip()
-                    if stmt and not stmt.upper().startswith('END'):
-                        sql_statements.append(stmt)
+        current_sql = ""
+        in_sql_statement = False
         
-        # 如果没有找到标准的IF结构，尝试更简单的方法
-        if not sql_statements:
-            # 查找所有可能的SQL语句关键字
-            sql_keywords = ['INSERT', 'UPDATE', 'DELETE', 'SELECT', 'MERGE', 'CREATE']
-            lines = if_block.split('\n')
+        for line in lines:
+            line_stripped = line.strip()
             
-            for line in lines:
-                line = line.strip()
-                if any(line.upper().startswith(keyword) for keyword in sql_keywords):
-                    sql_statements.append(line)
+            # 检查是否是SQL语句的开始
+            if any(line_stripped.upper().startswith(keyword) for keyword in sql_keywords):
+                # 如果前面有未完成的SQL语句，先保存
+                if current_sql.strip():
+                    sql_statements.append(current_sql.strip())
+                
+                current_sql = line
+                in_sql_statement = True
+            elif in_sql_statement:
+                # 继续当前SQL语句
+                current_sql += "\n" + line
+                
+                # 检查是否是SQL语句的结束（通过分号或下一个控制结构）
+                if (line_stripped.endswith(';') or 
+                    any(line_stripped.upper().startswith(kw) for kw in ['IF', 'ELSIF', 'ELSE', 'END']) or
+                    any(line_stripped.upper().startswith(kw) for kw in sql_keywords)):
+                    
+                    if line_stripped.endswith(';'):
+                        # 以分号结束的完整SQL
+                        sql_statements.append(current_sql.strip())
+                        current_sql = ""
+                        in_sql_statement = False
+                    elif any(line_stripped.upper().startswith(kw) for kw in sql_keywords):
+                        # 遇到新的SQL语句
+                        sql_statements.append(current_sql.replace(line, "").strip())
+                        current_sql = line
+                        in_sql_statement = True
+                    else:
+                        # 遇到控制结构，结束当前SQL
+                        sql_statements.append(current_sql.replace(line, "").strip())
+                        current_sql = ""
+                        in_sql_statement = False
         
-        # 如果仍然没有找到，返回整个IF块
-        if not sql_statements:
-            sql_statements.append(if_block)
+        # 处理最后一个SQL语句
+        if current_sql.strip():
+            sql_statements.append(current_sql.strip())
         
-        return sql_statements
+        # 方法2：使用正则表达式补充提取
+        # 提取多行SQL语句
+        sql_pattern = r'((?:INSERT|UPDATE|DELETE|SELECT|MERGE|CREATE)\s+(?:[^;]|\n)*?;)'
+        regex_matches = re.findall(sql_pattern, if_block, re.IGNORECASE | re.DOTALL)
+        
+        for match in regex_matches:
+            cleaned_sql = match.strip()
+            if cleaned_sql and cleaned_sql not in sql_statements:
+                sql_statements.append(cleaned_sql)
+        
+        # 清理和去重
+        cleaned_statements = []
+        for stmt in sql_statements:
+            stmt = stmt.strip()
+            if stmt and len(stmt) > 10:  # 过滤太短的语句
+                # 移除末尾的分号
+                if stmt.endswith(';'):
+                    stmt = stmt[:-1].strip()
+                
+                # 检查是否已存在相似的语句（避免重复）
+                is_duplicate = False
+                for existing in cleaned_statements:
+                    if stmt[:50] == existing[:50]:  # 比较前50个字符
+                        is_duplicate = True
+                        break
+                
+                if not is_duplicate:
+                    cleaned_statements.append(stmt)
+        
+        return cleaned_statements
 
     def _parse_single_statement(self, sql_text: str, statement_id: str) -> SQLStatement:
         """解析单个SQL语句"""
