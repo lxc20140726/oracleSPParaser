@@ -255,6 +255,60 @@ class UMLVisualizer:
         """解析简单字段引用"""
         field_expr = field_expr.strip()
         
+        # 处理特殊的表达式，如 SYSDATE, COUNT(*), AVG(field)
+        if 'SYSDATE' in field_expr.upper():
+            return {
+                'table': 'SYSTEM',
+                'field': 'SYSDATE',
+                'alias': None
+            }
+        
+        # 处理聚合函数，如 COUNT(*), AVG(salary)
+        if re.match(r'(COUNT|SUM|AVG|MIN|MAX|FIRST|LAST)\s*\(', field_expr, re.IGNORECASE):
+            
+            # 提取函数内的字段引用
+            func_pattern = r'(COUNT|SUM|AVG|MIN|MAX|FIRST|LAST)\s*\(([^)]+)\)'
+            func_match = re.search(func_pattern, field_expr, re.IGNORECASE)
+            if func_match:
+                func_name = func_match.group(1).upper()
+                inner_expr = func_match.group(2).strip()
+                
+                if inner_expr == '*':
+                    # COUNT(*) 的情况
+                    return {
+                        'table': 'AGGREGATE',
+                        'field': f'{func_name}(*)',
+                        'alias': None
+                    }
+                else:
+                    # 提取内部字段引用
+                    inner_field_match = re.search(r'(\w+)\.(\w+)', inner_expr)
+                    if inner_field_match:
+                        alias = inner_field_match.group(1)
+                        field_name = inner_field_match.group(2)
+                        table_name = alias_mapping.get(alias, alias)
+                        
+                        return {
+                            'table': table_name,
+                            'field': f'{func_name}({field_name})',
+                            'alias': alias if alias != table_name else None
+                        }
+                    else:
+                        # 简单字段名，如 AVG(salary)
+                        return {
+                            'table': 'AGGREGATE',
+                            'field': f'{func_name}({inner_expr})',
+                            'alias': None
+                        }
+        
+        # 处理参数引用，如 p_dept_id
+        if field_expr.startswith('p_') or field_expr.startswith('v_') or field_expr.startswith('l_'):
+            return {
+                'table': 'PARAMETER',
+                'field': field_expr,
+                'alias': None
+            }
+        
         # 匹配 alias.field 格式
         field_pattern = r'(\w+)\.(\w+)'
         match = re.search(field_pattern, field_expr)
