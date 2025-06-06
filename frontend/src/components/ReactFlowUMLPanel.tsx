@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -15,7 +15,7 @@ import ReactFlow, {
   MarkerType,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { UMLVisualizationData, UMLNode as UMLNodeType } from '../types';
+import { UMLVisualizationData } from '../types';
 
 interface ReactFlowUMLPanelProps {
   umlData: UMLVisualizationData | null;
@@ -129,6 +129,69 @@ const ReactFlowUMLPanel: React.FC<ReactFlowUMLPanelProps> = ({
     setSelectedNode(node.data);
   }, []);
 
+  // 计算表的层级关系
+  const calculateTableLevels = useCallback((tables: any[], fieldMappings: any[]) => {
+    const levels: Record<string, number> = {};
+    const inDegree: Record<string, number> = {};
+    const outEdges: Record<string, string[]> = {};
+    
+    // 初始化
+    tables.forEach(table => {
+      levels[table.id] = 0;
+      inDegree[table.id] = 0;
+      outEdges[table.id] = [];
+    });
+
+    // 构建图结构，基于字段映射关系
+    fieldMappings?.forEach(mapping => {
+      if (mapping.source && mapping.target && mapping.source !== mapping.target) {
+        inDegree[mapping.target] = (inDegree[mapping.target] || 0) + 1;
+        outEdges[mapping.source] = outEdges[mapping.source] || [];
+        if (!outEdges[mapping.source].includes(mapping.target)) {
+          outEdges[mapping.source].push(mapping.target);
+        }
+      }
+    });
+
+    // 拓扑排序确定层级
+    const queue: string[] = [];
+    
+    // 找到没有输入的表作为起始点
+    tables.forEach(table => {
+      if (inDegree[table.id] === 0) {
+        levels[table.id] = 0;
+        queue.push(table.id);
+      }
+    });
+
+    // 如果没有找到起始点，选择物理表作为起始点
+    if (queue.length === 0) {
+      tables.forEach(table => {
+        if (!table.properties?.is_temporary) {
+          levels[table.id] = 0;
+          queue.push(table.id);
+        }
+      });
+    }
+
+    // BFS计算层级
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const currentLevel = levels[current];
+      
+      outEdges[current]?.forEach(target => {
+        levels[target] = Math.max(levels[target], currentLevel + 1);
+        inDegree[target]--;
+        
+        if (inDegree[target] === 0) {
+          queue.push(target);
+        }
+      });
+    }
+
+    return levels;
+  }, []);
+
   // 自定义节点变化处理 - 实现表头拖拽时字段跟随
   const customOnNodesChange = useCallback((changes: any[]) => {
     // 处理表头拖拽时字段跟随
@@ -165,69 +228,103 @@ const ReactFlowUMLPanel: React.FC<ReactFlowUMLPanelProps> = ({
     onNodesChange(updatedChanges);
   }, [nodes, onNodesChange]);
 
-  // 生成React Flow数据
+  // 生成React Flow节点数据（仅在数据变化时重新计算位置）
   useEffect(() => {
     if (!umlData) {
       setNodes([]);
-      setEdges([]);
       return;
     }
 
     const flowNodes: Node[] = [];
-    const flowEdges: Edge[] = [];
+
+    // 计算表的层级
+    const tableLevels = calculateTableLevels(
+      umlData.nodes,
+      umlData.field_mappings
+    );
+
+    // 按层级分组表
+    const tablesByLevel: Record<number, any[]> = {};
+    umlData.nodes.forEach(table => {
+      const level = tableLevels[table.id];
+      if (!tablesByLevel[level]) {
+        tablesByLevel[level] = [];
+      }
+      tablesByLevel[level].push(table);
+    });
 
     // 为每个表生成节点
-    umlData.nodes.forEach((table, tableIndex) => {
-      const isTemporary = table.properties?.is_temporary || false;
-      const fields = table.properties?.fields || [];
+    Object.keys(tablesByLevel).forEach(levelStr => {
+      const level = parseInt(levelStr);
+      const tablesInLevel = tablesByLevel[level];
       
-      const baseX = (tableIndex % 3) * 300;
-      const baseY = Math.floor(tableIndex / 3) * 300;
+      tablesInLevel.forEach((table, tableIndexInLevel) => {
+        const isTemporary = table.properties?.is_temporary || false;
+        const fields = table.properties?.fields || [];
+        
+        // 层级布局
+        const levelWidth = 350; // 每层之间的间距
+        const tableHeight = 250; // 每个表之间的垂直间距
+        const baseX = level * levelWidth + 100;
+        const baseY = tableIndexInLevel * tableHeight + 100;
 
-      // 表头节点
-      const headerNodeId = `header-${table.id}`;
-      flowNodes.push({
-        id: headerNodeId,
-        type: 'tableHeader',
-        position: { x: baseX, y: baseY },
-        data: {
-          label: table.label,
-          isTemporary,
-          tableId: table.id,
-          nodeType: 'header',
-          properties: table.properties,
-        },
-        draggable: true,
-      });
-
-      // 字段节点
-      fields.forEach((field, fieldIndex) => {
-        const fieldNodeId = `field-${table.id}-${fieldIndex}`;
+        // 表头节点
+        const headerNodeId = `header-${table.id}`;
         flowNodes.push({
-          id: fieldNodeId,
-          type: 'tableField',
-          position: { 
-            x: baseX, 
-            y: baseY + 40 + (fieldIndex * 32) 
-          },
+          id: headerNodeId,
+          type: 'tableHeader',
+          position: { x: baseX, y: baseY },
           data: {
-            label: field.name,
-            isComputed: field.type === 'computed_field',
+            label: table.label,
             isTemporary,
-            isFirst: fieldIndex === 0,
-            isLast: fieldIndex === fields.length - 1,
             tableId: table.id,
-            fieldIndex,
-            nodeType: 'field',
-            field: field,
-            tableName: table.label,
-            onMouseEnter: () => setHoveredField(fieldNodeId),
-            onMouseLeave: () => setHoveredField(null),
+            nodeType: 'header',
+            properties: table.properties,
           },
-          draggable: false, // 字段不单独拖拽
+          draggable: true,
+        });
+
+        // 字段节点
+        fields.forEach((field, fieldIndex) => {
+          const fieldNodeId = `field-${table.id}-${fieldIndex}`;
+          flowNodes.push({
+            id: fieldNodeId,
+            type: 'tableField',
+            position: { 
+              x: baseX, 
+              y: baseY + 40 + (fieldIndex * 32) 
+            },
+            data: {
+              label: field.name,
+              isComputed: field.type === 'computed_field',
+              isTemporary,
+              isFirst: fieldIndex === 0,
+              isLast: fieldIndex === fields.length - 1,
+              tableId: table.id,
+              fieldIndex,
+              nodeType: 'field',
+              field: field,
+              tableName: table.label,
+              onMouseEnter: () => setHoveredField(fieldNodeId),
+              onMouseLeave: () => setHoveredField(null),
+            },
+            draggable: false, // 字段不单独拖拽
+          });
         });
       });
     });
+
+    setNodes(flowNodes);
+  }, [umlData, setNodes]);
+
+  // 生成连接线数据（响应悬停状态和显示开关）
+  useEffect(() => {
+    if (!umlData) {
+      setEdges([]);
+      return;
+    }
+
+    const flowEdges: Edge[] = [];
 
     // 生成连接线
     if (showFieldMappings && umlData.field_mappings) {
@@ -305,9 +402,8 @@ const ReactFlowUMLPanel: React.FC<ReactFlowUMLPanelProps> = ({
       });
     }
 
-    setNodes(flowNodes);
     setEdges(flowEdges);
-  }, [umlData, showFieldMappings, showTableRelations, setNodes, setEdges]);
+  }, [umlData, showFieldMappings, showTableRelations, hoveredField, setEdges]);
 
   if (isLoading) {
     return (
@@ -328,7 +424,7 @@ const ReactFlowUMLPanel: React.FC<ReactFlowUMLPanelProps> = ({
           <h3 className="text-xl font-semibold text-gray-700 mb-2">React Flow UML图表</h3>
           <p className="text-gray-500">请输入存储过程代码并点击"UML分析"按钮</p>
           <div className="mt-4 text-sm text-green-600">
-            ✨ 全新的可视化引擎，支持精确的字段级连接
+            ✨ 支持数据流向的层级布局
           </div>
         </div>
       </div>
@@ -341,7 +437,7 @@ const ReactFlowUMLPanel: React.FC<ReactFlowUMLPanelProps> = ({
       <div className="flex items-center justify-between p-4 border-b bg-gray-50">
         <div className="flex items-center space-x-2">
           <h3 className="text-lg font-semibold text-gray-800 flex items-center">
-            🚀 React Flow UML图表
+            🚀 UML图表 (层级布局)
           </h3>
           <div className="text-sm text-gray-500">
             ({umlData.metadata.total_tables} 个表, {umlData.metadata.field_mappings_count} 个字段映射)
@@ -475,7 +571,7 @@ const ReactFlowUMLPanel: React.FC<ReactFlowUMLPanelProps> = ({
               <span>表关系(JOIN)</span>
             </div>
             <div className="text-gray-500 text-xs mt-2">
-              💡 悬停字段查看相关连接
+              💡 层级布局：数据流向从左到右
             </div>
           </div>
         </div>

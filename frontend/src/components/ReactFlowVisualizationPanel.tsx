@@ -113,44 +113,139 @@ const ReactFlowVisualizationPanel: React.FC<ReactFlowVisualizationPanelProps> = 
     setSelectedNode(node.data);
   }, []);
 
-  // 生成React Flow数据
+  // 计算节点层级的函数
+  const calculateNodeLevels = useCallback((nodes: VisualizationNode[], edges: VisualizationEdge[]) => {
+    const levels: Record<string, number> = {};
+    const inDegree: Record<string, number> = {};
+    const outEdges: Record<string, string[]> = {};
+    
+    // 初始化
+    nodes.forEach(node => {
+      levels[node.id] = 0;
+      inDegree[node.id] = 0;
+      outEdges[node.id] = [];
+    });
+
+    // 构建图结构，只考虑数据流向边
+    edges.forEach(edge => {
+      if (edge.type === 'data_flow') {
+        inDegree[edge.target] = (inDegree[edge.target] || 0) + 1;
+        outEdges[edge.source] = outEdges[edge.source] || [];
+        outEdges[edge.source].push(edge.target);
+      }
+    });
+
+    // 拓扑排序确定层级
+    const queue: string[] = [];
+    
+    // 参数节点总是在第0层
+    nodes.forEach(node => {
+      if (node.group === 'parameter') {
+        levels[node.id] = 0;
+        queue.push(node.id);
+      } else if (inDegree[node.id] === 0) {
+        levels[node.id] = 1; // 没有输入的表节点放在第1层
+        queue.push(node.id);
+      }
+    });
+
+    // BFS计算层级
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const currentLevel = levels[current];
+      
+      outEdges[current]?.forEach(target => {
+        levels[target] = Math.max(levels[target], currentLevel + 1);
+        inDegree[target]--;
+        
+        if (inDegree[target] === 0) {
+          queue.push(target);
+        }
+      });
+    }
+
+    return levels;
+  }, []);
+
+  // 生成React Flow节点数据（仅在数据变化时重新计算位置）
   useEffect(() => {
     if (!analysisResult?.visualization) {
       setNodes([]);
-      setEdges([]);
       return;
     }
 
     const flowNodes: Node[] = [];
-    const flowEdges: Edge[] = [];
 
-    // 转换节点
-    analysisResult.visualization.nodes.forEach((node, index) => {
-      let nodeType = 'physical_table';
-      if (node.group === 'parameter') {
-        nodeType = 'parameter';
-      } else if (node.group === 'temp_table') {
-        nodeType = 'temp_table';
+    // 计算节点层级
+    const nodeLevels = calculateNodeLevels(
+      analysisResult.visualization.nodes,
+      analysisResult.visualization.edges
+    );
+
+    // 按层级分组节点
+    const nodesByLevel: Record<number, VisualizationNode[]> = {};
+    analysisResult.visualization.nodes.forEach(node => {
+      const level = nodeLevels[node.id];
+      if (!nodesByLevel[level]) {
+        nodesByLevel[level] = [];
       }
+      nodesByLevel[level].push(node);
+    });
 
-      // 简单的网格布局
-      const columns = 4;
-      const baseX = (index % columns) * 250;
-      const baseY = Math.floor(index / columns) * 150;
+    // 转换节点并按层级布局
+    Object.keys(nodesByLevel).forEach(levelStr => {
+      const level = parseInt(levelStr);
+      const nodesInLevel = nodesByLevel[level];
+      
+      nodesInLevel.forEach((node, indexInLevel) => {
+        let nodeType = 'physical_table';
+        if (node.group === 'parameter') {
+          nodeType = 'parameter';
+        } else if (node.group === 'temp_table') {
+          nodeType = 'temp_table';
+        }
 
-      flowNodes.push({
-        id: node.id,
-        type: nodeType,
-        position: { x: baseX, y: baseY },
-        data: {
-          label: node.label,
-          nodeType: node.type,
-          originalData: node.data,
-          group: node.group,
-        },
-        draggable: true,
+        // 层级布局：X轴按层级，Y轴按同层级内的索引
+        const levelWidth = 300; // 每层之间的间距
+        const nodeHeight = 120; // 每个节点之间的垂直间距
+        const levelOffset = level * levelWidth + 100; // X坐标
+        const verticalOffset = indexInLevel * nodeHeight + 100; // Y坐标
+        
+        // 如果同一层节点太多，可以分列排列
+        const maxNodesPerColumn = 6;
+        const column = Math.floor(indexInLevel / maxNodesPerColumn);
+        const rowInColumn = indexInLevel % maxNodesPerColumn;
+        
+        const finalX = levelOffset + (column * 200);
+        const finalY = verticalOffset - (column * maxNodesPerColumn * nodeHeight / 2) + (rowInColumn * nodeHeight);
+
+        flowNodes.push({
+          id: node.id,
+          type: nodeType,
+          position: { x: finalX, y: finalY },
+          data: {
+            label: node.label,
+            nodeType: node.type,
+            originalData: node.data,
+            group: node.group,
+            level: level,
+          },
+          draggable: true,
+        });
       });
     });
+
+    setNodes(flowNodes);
+  }, [analysisResult, setNodes]);
+
+  // 生成连接线数据（响应显示开关）
+  useEffect(() => {
+    if (!analysisResult?.visualization) {
+      setEdges([]);
+      return;
+    }
+
+    const flowEdges: Edge[] = [];
 
     // 转换边
     analysisResult.visualization.edges.forEach((edge, index) => {
@@ -158,35 +253,35 @@ const ReactFlowVisualizationPanel: React.FC<ReactFlowVisualizationPanelProps> = 
       if (!showJoinConditions && edge.type === 'join_condition') return;
       if (!showParameterUsage && edge.type === 'parameter_usage') return;
 
-             let edgeStyle: any = {};
-       let markerEnd = { type: MarkerType.ArrowClosed, color: '#569bff' };
-       let animated = false;
+      let edgeStyle: any = {};
+      let markerEnd = { type: MarkerType.ArrowClosed, color: '#569bff' };
+      let animated = false;
 
-       switch (edge.type) {
-         case 'data_flow':
-           edgeStyle = {
-             stroke: '#569bff',
-             strokeWidth: 4,
-           };
-           markerEnd.color = '#569bff';
-           break;
-         case 'join_condition':
-           edgeStyle = {
-             stroke: '#ef4444',
-             strokeWidth: 5,
-           };
-           markerEnd.color = '#ef4444';
-           break;
-         case 'parameter_usage':
-           edgeStyle = {
-             stroke: '#8b5cf6',
-             strokeWidth: 3,
-             strokeDasharray: '8,4',
-           };
-           markerEnd.color = '#8b5cf6';
-           animated = true;
-           break;
-       }
+      switch (edge.type) {
+        case 'data_flow':
+          edgeStyle = {
+            stroke: '#569bff',
+            strokeWidth: 4,
+          };
+          markerEnd.color = '#569bff';
+          break;
+        case 'join_condition':
+          edgeStyle = {
+            stroke: '#ef4444',
+            strokeWidth: 5,
+          };
+          markerEnd.color = '#ef4444';
+          break;
+        case 'parameter_usage':
+          edgeStyle = {
+            stroke: '#8b5cf6',
+            strokeWidth: 3,
+            strokeDasharray: '8,4',
+          };
+          markerEnd.color = '#8b5cf6';
+          animated = true;
+          break;
+      }
 
       flowEdges.push({
         id: `edge-${index}`,
@@ -210,9 +305,8 @@ const ReactFlowVisualizationPanel: React.FC<ReactFlowVisualizationPanelProps> = 
       });
     });
 
-    setNodes(flowNodes);
     setEdges(flowEdges);
-  }, [analysisResult, showDataFlow, showJoinConditions, showParameterUsage, setNodes, setEdges]);
+  }, [analysisResult, showDataFlow, showJoinConditions, showParameterUsage, setEdges]);
 
   if (isLoading) {
     return (
@@ -233,7 +327,7 @@ const ReactFlowVisualizationPanel: React.FC<ReactFlowVisualizationPanelProps> = 
           <h3 className="text-xl font-semibold text-gray-700 mb-2">Oracle SP 智能分析</h3>
           <p className="text-gray-500">请输入存储过程代码并点击"智能分析"按钮</p>
           <div className="mt-4 text-sm text-blue-600">
-            ✨ 基于React Flow的全新可视化引擎
+            ✨ 支持数据流向的智能层级布局
           </div>
         </div>
       </div>
@@ -246,7 +340,7 @@ const ReactFlowVisualizationPanel: React.FC<ReactFlowVisualizationPanelProps> = 
       <div className="flex items-center justify-between p-4 border-b bg-gray-50">
         <div className="flex items-center space-x-2">
           <h3 className="text-lg font-semibold text-gray-800 flex items-center">
-            📊 智能分析可视化
+            📊 智能分析 (层级布局)
           </h3>
           <div className="text-sm text-gray-500">
             ({analysisResult.visualization.metadata.node_count} 个节点, {analysisResult.visualization.metadata.edge_count} 个连接)
@@ -372,6 +466,9 @@ const ReactFlowVisualizationPanel: React.FC<ReactFlowVisualizationPanelProps> = 
             <div className="flex items-center">
               <div className="w-4 h-1 border-b-2 border-dashed border-purple-500 mr-2"></div>
               <span>参数使用</span>
+            </div>
+            <div className="text-gray-500 text-xs mt-2">
+              💡 层级布局：数据流向从左到右
             </div>
           </div>
         </div>
